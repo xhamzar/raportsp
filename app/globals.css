@@ -1,0 +1,95 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --bg-canvas: #F8FAFC;
+    --bg-surface: #FFFFFF;
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --border-hairline: #E2E8F0;
+    --navy-primary: #0F2942;
+    --navy-secondary: #1E3A5F;
+    --accent-blue: #1D4ED8;
+  }
+
+  .dark {
+    --bg-canvas: #0B1320;
+    --bg-surface: #111C2E;
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --border-hairline: #1E293B;
+    --navy-primary: #1E3A5F;
+    --navy-secondary: #2B4C7E;
+    --accent-blue: #60A5FA;
+  }
+
+  body {
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 14mm 15mm 14mm 15mm;
+  }
+
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .rapor-page-break {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .rapor-table {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .rapor-table thead {
+    display: table-header-group;
+  }
+
+  .rapor-table tbody tr {
+    page-break-inside: auto;
+    break-inside: auto;
+  }
+
+  .rapor-table td {
+    page-break-inside: auto;
+    break-inside: auto;
+    orphans: 2;
+    widows: 2;
+  }
+
+  .first-data-row {
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+
+  .rapor-signature-block {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}

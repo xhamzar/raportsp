@@ -1,0 +1,6 @@
+{
+  "name": "SEKOLAHKITA — Sistem Manajemen Sekolah",
+  "description": "Sistem Manajemen Sekolah dan Administrasi Guru Terpadu Kurikulum Merdeka (SD/MI) dengan SQLite luring-utama, Rapor A4, ExcelJS, dan Integrasi Dapodik.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
