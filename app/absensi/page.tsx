@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Download, Save } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
-import { AlertBox, Button, Input, TableSkeleton } from '@/components/ui/Primitives';
+import { AlertBox, Button, Input, TabBar, TableSkeleton } from '@/components/ui/Primitives';
 
 interface StudentAttRow {
   no: number;
@@ -146,15 +146,15 @@ function AbsensiInner() {
   };
 
   return (
-    <AppShell title="Presensi Harian" requiredModule="absensi">
+    <AppShell title="Presensi" requiredModule="absensi">
       <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900 dark:text-slate-100">
-              Presensi Harian {tab === 'murid' ? `Murid — Kelas ${selectedClass?.name}` : 'Pendidik & Guru'}
+              Presensi {tab === 'murid' ? `Murid — Kelas ${selectedClass?.name}` : 'Guru & Tendik'}
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Pencatatan kehadiran harian (H/S/I/A), deteksi hari libur kalender, dan rekap otomatis ke lembar Rapor.
+              Pencatatan kehadiran harian dengan deteksi hari libur kalender dan rekap otomatis ke rapor.
             </p>
           </div>
           {tab === 'murid' && (
@@ -192,34 +192,18 @@ function AbsensiInner() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-md w-fit">
-            <button
-              type="button"
-              onClick={() => setTab('murid')}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded cursor-pointer ${
-                tab === 'murid'
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              Presensi Murid
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('guru')}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded cursor-pointer ${
-                tab === 'guru'
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              Presensi Guru
-            </button>
-          </div>
+          <TabBar
+            items={[
+              { id: 'murid', label: 'Presensi Murid' },
+              { id: 'guru', label: 'Presensi Guru' },
+            ]}
+            activeId={tab}
+            onChange={(id) => setTab(id as 'murid' | 'guru')}
+          />
 
-          <div className="w-48">
+          <div className="w-44 shrink-0">
             <Input
-              label="Tanggal Presensi"
+              aria-label="Tanggal Presensi"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -403,7 +387,7 @@ function AbsensiInner() {
 
 export default function AbsensiPage() {
   return (
-    <Suspense fallback={<AppShell title="Presensi Harian" requiredModule="absensi"><TableSkeleton rows={8} /></AppShell>}>
+    <Suspense fallback={<AppShell title="Presensi" requiredModule="absensi"><TableSkeleton rows={8} /></AppShell>}>
       <AbsensiInner />
     </Suspense>
   );

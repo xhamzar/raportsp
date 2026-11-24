@@ -13,6 +13,7 @@ import {
   Input,
   Modal,
   Select,
+  TabBar,
   TableSkeleton,
 } from '@/components/ui/Primitives';
 
@@ -375,15 +376,15 @@ function KurikulumInner() {
   };
 
   return (
-    <AppShell title="Mapel, CP & TP" requiredModule="kurikulum">
+    <AppShell title="Kurikulum & RPM" requiredModule="kurikulum">
       <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900 dark:text-slate-100">
-              Kurikulum Merdeka — Kelas {selectedClass?.name} (Fase {selectedClass?.fase})
+              Kurikulum & RPM — Kelas {selectedClass?.name} (Fase {selectedClass?.fase})
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Pengelolaan mata pelajaran intrakurikuler, Capaian Pembelajaran (CP), TP/ATP, dan Rencana Pembelajaran Mendalam.
+              Pengelolaan mata pelajaran, Capaian Pembelajaran (CP), TP/ATP, dan Rencana Pembelajaran Mendalam.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -420,26 +421,32 @@ function KurikulumInner() {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-md w-fit">
-          {[
-            { id: 'mapel', label: `Mata Pelajaran (${subjects.length})` },
-            { id: 'cptp', label: 'Capaian & Tujuan Pembelajaran (CP/TP)' },
-            { id: 'rpm', label: `Generator RPM (${rpmPlans.length})` },
-          ].map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id as 'mapel' | 'cptp' | 'rpm')}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded cursor-pointer transition-colors ${
-                tab === item.id
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <TabBar
+            items={[
+              { id: 'mapel', label: `Mata Pelajaran (${subjects.length})` },
+              { id: 'cptp', label: 'CP & TP/ATP' },
+              { id: 'rpm', label: `RPM (${rpmPlans.length})` },
+            ]}
+            activeId={tab}
+            onChange={(id) => setTab(id as 'mapel' | 'cptp' | 'rpm')}
+          />
+
+          {tab === 'cptp' && (
+            <div className="w-full sm:w-72 shrink-0">
+              <Select
+                aria-label="Pilih Mata Pelajaran"
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(Number(e.target.value))}
+              >
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.code})
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -511,26 +518,6 @@ function KurikulumInner() {
           </div>
         ) : tab === 'cptp' ? (
           <div className="space-y-4">
-            <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-              <div className="w-full sm:w-80">
-                <Select
-                  label="Pilih Mata Pelajaran"
-                  value={selectedSubjectId}
-                  onChange={(e) => setSelectedSubjectId(Number(e.target.value))}
-                >
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} ({s.code})
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-                CP Tercatat: <strong>{activeCps.length}</strong> · TP / ATP Tercatat:{' '}
-                <strong>{activeTps.length}</strong>
-              </div>
-            </div>
-
             {/* CP List */}
             <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-3">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">

@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Calendar, Plus, Save, School } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
-import { Button, Input, Modal, Select, TableSkeleton } from '@/components/ui/Primitives';
+import { Button, Input, Modal, Select, TabBar, TableSkeleton } from '@/components/ui/Primitives';
 
 interface SchoolData {
   school: {
@@ -189,33 +189,21 @@ function SekolahInner() {
   };
 
   return (
-    <AppShell title="Identitas Sekolah" requiredModule="sekolah">
+    <AppShell title="Sekolah & Kalender" requiredModule="sekolah">
       {loading || !form || !data ? (
         <TableSkeleton rows={6} />
       ) : (
         <div className="space-y-5">
-          {/* Segmented Tab Bar */}
-          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-md w-fit">
-            {[
-              { id: 'profil', label: 'Data Pokok Sekolah' },
-              { id: 'akademik', label: 'Tahun Ajaran & Semester' },
-              { id: 'kalender', label: 'Kalender Pendidikan' },
-              { id: 'sarpras', label: 'Ruang & Sarpras' },
-            ].map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id as typeof tab)}
-                className={`px-3.5 py-2 text-xs font-medium rounded transition-colors whitespace-nowrap cursor-pointer ${
-                  tab === t.id
-                    ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <TabBar
+            items={[
+              { id: 'profil', label: 'Profil Sekolah' },
+              { id: 'akademik', label: 'Tahun & Semester' },
+              { id: 'kalender', label: 'Kalender' },
+              { id: 'sarpras', label: 'Sarpras' },
+            ]}
+            activeId={tab}
+            onChange={(id) => setTab(id as typeof tab)}
+          />
 
           {tab === 'profil' && (
             <form
@@ -426,14 +414,14 @@ function SekolahInner() {
           )}
 
           {tab === 'kalender' && (
-            <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-4">
-              <div className="flex items-center justify-between">
+            <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
                 <div>
                   <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                     Kalender Pendidikan & Hari Libur
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Terintegrasi langsung dengan peringatan hari libur pada halaman Presensi Harian.
+                    Terintegrasi langsung dengan peringatan hari libur pada halaman Presensi.
                   </p>
                 </div>
                 {canUpdateSchool && (
@@ -443,25 +431,25 @@ function SekolahInner() {
                   </Button>
                 )}
               </div>
-              <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-md">
+              <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
                     <tr>
-                      <th className="py-2.5 px-3 font-semibold">Tanggal</th>
-                      <th className="py-2.5 px-3 font-semibold">Kegiatan / Agenda</th>
-                      <th className="py-2.5 px-3 font-semibold">Kategori</th>
-                      <th className="py-2.5 px-3 font-semibold">Status Hari</th>
+                      <th className="py-2.5 px-4 font-semibold">Tanggal</th>
+                      <th className="py-2.5 px-4 font-semibold">Kegiatan / Agenda</th>
+                      <th className="py-2.5 px-4 font-semibold">Kategori</th>
+                      <th className="py-2.5 px-4 font-semibold">Status Hari</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {data.calendars.map((c) => (
                       <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                        <td className="py-2.5 px-3 font-mono tabular-nums whitespace-nowrap">
+                        <td className="py-2.5 px-4 font-mono tabular-nums whitespace-nowrap">
                           {c.startDate === c.endDate ? c.startDate : `${c.startDate} s.d. ${c.endDate}`}
                         </td>
-                        <td className="py-2.5 px-3 font-medium">{c.title}</td>
-                        <td className="py-2.5 px-3 text-slate-500">{c.category}</td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-2.5 px-4 font-medium">{c.title}</td>
+                        <td className="py-2.5 px-4 text-slate-500">{c.category}</td>
+                        <td className="py-2.5 px-4">
                           <span className={c.isHoliday ? 'text-red-600 font-medium' : 'text-emerald-700'}>
                             {c.isHoliday ? 'Hari Libur' : 'Hari Efektif'}
                           </span>

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, PlugZap, RefreshCw, Send, Upload, Download } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
-import { AlertBox, Button, Input, Select, TableSkeleton } from '@/components/ui/Primitives';
+import { AlertBox, Button, Input, Select, TabBar, TableSkeleton } from '@/components/ui/Primitives';
 
 interface DapodikSyncLog {
   id: number;
@@ -286,41 +286,21 @@ export default function IntegrasiPage() {
       <div className="space-y-5">
         <div>
           <h1 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900 dark:text-slate-100">
-            Integrasi Protokol WebService Dapodik & E-Rapor
+            Integrasi Dapodik & E-Rapor
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Protokol resmi Dapodik Desktop (port 5774: getSekolah, getRombonganBelajar, getGtk, getPesertaDidik, postMatevRapor, postNilai?table=rapor dengan UUID v5 deterministik) dan mode Sandbox.
+            Sinkronisasi data rombel dan pengiriman nilai ke WebService Dapodik maupun impor/ekspor berkas E-Rapor.
           </p>
         </div>
 
-        <div className="flex items-center gap-1 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-md w-fit">
-          {canReadDapodik && (
-            <button
-              type="button"
-              onClick={() => setTab('dapodik')}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded cursor-pointer ${
-                activeTab === 'dapodik'
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              Integrasi Dapodik
-            </button>
-          )}
-          {canReadErapor && (
-            <button
-              type="button"
-              onClick={() => setTab('erapor')}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded cursor-pointer ${
-                activeTab === 'erapor'
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              Impor / Ekspor E-Rapor
-            </button>
-          )}
-        </div>
+        <TabBar
+          items={[
+            ...(canReadDapodik ? [{ id: 'dapodik', label: 'Dapodik' }] : []),
+            ...(canReadErapor ? [{ id: 'erapor', label: 'E-Rapor' }] : []),
+          ]}
+          activeId={activeTab}
+          onChange={(id) => setTab(id as 'dapodik' | 'erapor')}
+        />
 
         {loading ? (
           <TableSkeleton rows={6} />

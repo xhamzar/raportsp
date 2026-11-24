@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Download, Printer, RefreshCw } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
-import { Button, EmptyState, TableSkeleton } from '@/components/ui/Primitives';
+import { Button, EmptyState, TabBar, TableSkeleton } from '@/components/ui/Primitives';
 
 interface SubjectItem {
   id: number;
@@ -144,7 +144,7 @@ function LaporanInner() {
               <Link href={activeTab === 'keasramaan' ? '/cetak?doc=keasramaan' : '/cetak?doc=rapor'}>
                 <Button size="sm">
                   <Printer className="w-4 h-4" />
-                  Buka Pusat Cetak
+                  Cetak Rapor
                 </Button>
               </Link>
             )}
@@ -152,30 +152,14 @@ function LaporanInner() {
         </div>
 
         {hasNilaiRead && showKeasramaan && (
-          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-md w-fit">
-            <button
-              type="button"
-              onClick={() => setTab('nilai')}
-              className={`px-3 py-1.5 text-xs font-medium rounded cursor-pointer whitespace-nowrap ${
-                activeTab === 'nilai'
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              Rekap Nilai
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('keasramaan')}
-              className={`px-3 py-1.5 text-xs font-medium rounded cursor-pointer whitespace-nowrap ${
-                activeTab === 'keasramaan'
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              Rekap Keasramaan
-            </button>
-          </div>
+          <TabBar
+            items={[
+              { id: 'nilai', label: 'Rekap Nilai' },
+              { id: 'keasramaan', label: 'Rekap Keasramaan' },
+            ]}
+            activeId={activeTab}
+            onChange={(id) => setTab(id as 'nilai' | 'keasramaan')}
+          />
         )}
 
         {activeTab === 'nilai' ? (

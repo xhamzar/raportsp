@@ -11,6 +11,7 @@ import {
   Input,
   Modal,
   Select,
+  TabBar,
   TableSkeleton,
 } from '@/components/ui/Primitives';
 
@@ -481,26 +482,26 @@ function PenilaianInner() {
   const navTabs = [
     ...(hasAcademicRead
       ? [
-          { id: 'sumatif', label: 'Sumatif & Rapor' },
+          { id: 'sumatif', label: 'Sumatif' },
           { id: 'formatif', label: 'Formatif (TP)' },
-          { id: 'kokurikuler', label: 'Kokurikuler (8 DPL)' },
+          { id: 'kokurikuler', label: 'Kokurikuler' },
           { id: 'ekstra', label: 'Ekstrakurikuler' },
-          { id: 'catatan', label: 'Catatan Wali Kelas' },
+          { id: 'catatan', label: 'Catatan Wali' },
         ]
       : []),
-    ...(showKeasramaan ? [{ id: 'keasramaan', label: 'Pembinaan Keasramaan' }] : []),
+    ...(showKeasramaan ? [{ id: 'keasramaan', label: 'Keasramaan' }] : []),
   ];
 
   return (
-    <AppShell title="Asesmen & Nilai" requiredModule={['penilaian', 'keasramaan']}>
+    <AppShell title="Penilaian" requiredModule={['penilaian', 'keasramaan']}>
       <div className="space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900 dark:text-slate-100">
-              Pengelolaan Asesmen & Penilaian — Kelas {selectedClass?.name}
+              Penilaian — Kelas {selectedClass?.name}
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Bobot aktif: LM {weights.weightLm}% · STS {weights.weightSts}% · SAS {weights.weightSas}% · KKTP {weights.kktpMin}
+            <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+              Bobot: LM {weights.weightLm}% · STS {weights.weightSts}% · SAS {weights.weightSas}% · KKTP {weights.kktpMin}
             </p>
           </div>
           {activeTab === 'sumatif' && (canUpdateScores || canExportScores) && (
@@ -547,30 +548,17 @@ function PenilaianInner() {
           )}
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-md w-fit">
-          {navTabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id as typeof tab)}
-              className={`px-3 py-1.5 text-xs font-medium rounded cursor-pointer ${
-                activeTab === t.id
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <TabBar
+            items={navTabs}
+            activeId={activeTab}
+            onChange={(id) => setTab(id as typeof tab)}
+          />
 
-        {/* Subject Selector for Sumatif & Formatif */}
-        {(activeTab === 'sumatif' || activeTab === 'formatif') && (
-          <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="w-full sm:w-80">
+          {(activeTab === 'sumatif' || activeTab === 'formatif') && (
+            <div className="w-full sm:w-72 shrink-0">
               <Select
-                label="Mata Pelajaran"
+                aria-label="Pilih Mata Pelajaran"
                 value={selectedSubjectId}
                 onChange={(e) => setSelectedSubjectId(Number(e.target.value))}
               >
@@ -581,11 +569,8 @@ function PenilaianInner() {
                 ))}
               </Select>
             </div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">
-              Rumus Nilai Rapor: (Rata-rata LM × {weights.weightLm}%) + (STS × {weights.weightSts}%) + (SAS × {weights.weightSas}%)
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {loading ? (
           <TableSkeleton rows={8} />
@@ -658,36 +643,36 @@ function PenilaianInner() {
             {formativeByStudent.map((stu) => (
               <div
                 key={stu.studentId}
-                className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-4 space-y-3"
+                className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {stu.fullName}
-                    </h3>
-                    <p className="text-[11px] font-mono tabular-nums text-slate-500">
-                      NISN {stu.nisn}
-                    </p>
-                  </div>
+                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {stu.fullName}
+                  </h3>
+                  <span className="text-[11px] font-mono tabular-nums text-slate-500">
+                    NISN {stu.nisn}
+                  </span>
                 </div>
                 {stu.items.length === 0 ? (
-                  <p className="text-xs text-slate-500">Belum ada Tujuan Pembelajaran untuk mapel ini.</p>
+                  <p className="p-4 text-xs text-slate-500">
+                    Belum ada Tujuan Pembelajaran untuk mapel ini.
+                  </p>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {stu.items.map((item) => (
                       <div
                         key={item.tpId}
-                        className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 flex flex-col justify-between gap-2"
+                        className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                       >
-                        <div>
+                        <div className="min-w-0">
                           <div className="text-xs font-semibold text-[#0F2942] dark:text-blue-400">
                             {item.code} · {item.scopeMaterial}
                           </div>
-                          <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5 line-clamp-2">
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5 line-clamp-2">
                             {item.description}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2.5 sm:w-56 shrink-0">
                           <select
                             aria-label={`Status TP ${item.code} untuk ${stu.fullName}`}
                             value={item.status}
@@ -702,7 +687,7 @@ function PenilaianInner() {
                             <option value="Perlu Pendalaman">Perlu Pendalaman</option>
                             <option value="Perlu Bimbingan">Perlu Bimbingan</option>
                           </select>
-                          <span className="text-[11px] font-mono tabular-nums text-slate-500">
+                          <span className="w-8 text-right text-xs font-mono tabular-nums text-slate-500">
                             {item.score ?? '-'}
                           </span>
                         </div>
@@ -829,9 +814,9 @@ function PenilaianInner() {
             {keasRows.map((stu) => (
               <div
                 key={stu.studentId}
-                className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-4 space-y-3"
+                className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       {stu.fullName}
@@ -874,11 +859,11 @@ function PenilaianInner() {
                   </div>
                 </div>
 
-                <div className="space-y-2.5">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   {stu.items.map((item) => (
                     <div
                       key={item.indicatorId}
-                      className="p-3 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-start"
+                      className="px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-center"
                     >
                       <div className="lg:col-span-3">
                         <p className="text-[11px] text-slate-500">{item.category}</p>

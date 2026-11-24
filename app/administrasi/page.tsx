@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Check, Plus } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
-import { Button, Input, Modal, Select, TableSkeleton } from '@/components/ui/Primitives';
+import { Button, Input, Modal, Select, TabBar, TableSkeleton } from '@/components/ui/Primitives';
 
 interface GuestRow {
   id: number;
@@ -168,10 +168,10 @@ function AdministrasiInner() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900 dark:text-slate-100">
-              Administrasi Umum: Buku Tamu & Perjalanan Dinas Luar
+              Buku Tamu & Dinas Luar
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Pencatatan tamu sekolah, keperluan kunjungan, dan pengajuan/persetujuan surat tugas dinas luar.
+              Pencatatan tamu sekolah serta pengajuan dan persetujuan surat tugas dinas luar.
             </p>
           </div>
           {canCreateAdmin && (
@@ -185,30 +185,14 @@ function AdministrasiInner() {
           )}
         </div>
 
-        <div className="flex items-center gap-1 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-md w-fit">
-          <button
-            type="button"
-            onClick={() => setTab('tamu')}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded cursor-pointer ${
-              tab === 'tamu'
-                ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Buku Tamu ({guests.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('dinas')}
-            className={`px-3.5 py-1.5 text-xs font-medium rounded cursor-pointer ${
-              tab === 'dinas'
-                ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-300'
-            }`}
-          >
-            Dinas Luar ({travels.length})
-          </button>
-        </div>
+        <TabBar
+          items={[
+            { id: 'tamu', label: `Buku Tamu (${guests.length})` },
+            { id: 'dinas', label: `Dinas Luar (${travels.length})` },
+          ]}
+          activeId={tab}
+          onChange={(id) => setTab(id as 'tamu' | 'dinas')}
+        />
 
         {loading ? (
           <TableSkeleton rows={6} />

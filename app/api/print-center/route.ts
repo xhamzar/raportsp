@@ -10,8 +10,10 @@ import {
   cocurricularScores,
   guestbookEntries,
   officialTravels,
+  schoolCalendars,
   schools,
   semesters,
+  studentAttendance,
   students,
   subjects,
   summativeScores,
@@ -292,6 +294,7 @@ export async function GET(req: NextRequest) {
         objectiveSummary: teacherJournals.objectiveSummary,
         activities: teacherJournals.activities,
         completionStatus: teacherJournals.completionStatus,
+        notes: teacherJournals.notes,
       })
       .from(teacherJournals)
       .innerJoin(teachers, eq(teacherJournals.teacherId, teachers.id))
@@ -304,11 +307,54 @@ export async function GET(req: NextRequest) {
       journals = journals.filter((j) => canTeacherAccessScope(user, j.classId, j.subjectId));
     }
 
+    const stuAttRows = await db
+      .select({
+        classId: studentAttendance.classId,
+        date: studentAttendance.date,
+        status: studentAttendance.status,
+      })
+      .from(studentAttendance)
+      .where(
+        targetClass
+          ? and(
+              eq(studentAttendance.classId, targetClass.id),
+              eq(studentAttendance.semesterId, activeSemester.id)
+            )
+          : eq(studentAttendance.semesterId, activeSemester.id)
+      );
+
+    const attCountByClassDate = new Map<
+      string,
+      { H: number; S: number; I: number; A: number }
+    >();
+    for (const row of stuAttRows) {
+      const key = `${row.classId}:${row.date}`;
+      const cur = attCountByClassDate.get(key) || { H: 0, S: 0, I: 0, A: 0 };
+      if (row.status === 'H') cur.H += 1;
+      else if (row.status === 'S') cur.S += 1;
+      else if (row.status === 'I') cur.I += 1;
+      else if (row.status === 'A') cur.A += 1;
+      attCountByClassDate.set(key, cur);
+    }
+
+    const enrichedJournals = journals.map((j) => {
+      const counts = attCountByClassDate.get(`${j.classId}:${j.date}`) || {
+        H: 0,
+        S: 0,
+        I: 0,
+        A: 0,
+      };
+      return {
+        ...j,
+        attendanceSummary: `${counts.H}/${counts.S}/${counts.I}/${counts.A}`,
+      };
+    });
+
     return NextResponse.json({
       ...baseMeta,
       doc: docParam,
       month: monthParam,
-      journals,
+      journals: enrichedJournals,
     });
   }
 
@@ -333,7 +379,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Presensi Guru & Laporan TPP
-  const [teacherList, assignments, attRows, travels] = await Promise.all([
+  const [teacherList, assignments, allSemAttRows, travels, calendars] = await Promise.all([
     db.select().from(teachers).where(eq(teachers.isActive, true)).orderBy(asc(teachers.fullName)),
     db
       .select()
@@ -342,13 +388,105 @@ export async function GET(req: NextRequest) {
     db
       .select()
       .from(teacherAttendance)
-      .where(
-        monthParam && /^\d{4}-\d{2}$/.test(monthParam)
-          ? like(teacherAttendance.date, `${monthParam}%`)
-          : eq(teacherAttendance.semesterId, activeSemester.id)
-      ),
+      .where(eq(teacherAttendance.semesterId, activeSemester.id)),
     db.select().from(officialTravels),
+    db
+      .select()
+      .from(schoolCalendars)
+      .where(eq(schoolCalendars.semesterId, activeSemester.id)),
   ]);
+
+  const hasExplicitMonth = Boolean(monthParam && /^\d{4}-\d{2}$/.test(monthParam));
+  const latestAttDate = allSemAttRows
+    .map((r) => r.date)
+    .sort()
+    .at(-1);
+  const resolvedMonth = hasExplicitMonth
+    ? monthParam
+    : latestAttDate
+    ? latestAttDate.slice(0, 7)
+    : new Date().toISOString().slice(0, 7);
+
+  const attRows = hasExplicitMonth
+    ? allSemAttRows.filter((r) => r.date.startsWith(resolvedMonth))
+    : allSemAttRows;
+
+  const monthlyAttRows = allSemAttRows.filter((r) => r.date.startsWith(resolvedMonth));
+
+  const [yearStr, monthStr] = resolvedMonth.split('-');
+  const yearNum = Number(yearStr) || new Date().getFullYear();
+  const monthNum = Number(monthStr) || new Date().getMonth() + 1;
+  const daysInMonth = new Date(yearNum, monthNum, 0).getDate();
+
+  const dailyCalendar: Array<{
+    day: number;
+    date: string;
+    isWeekend: boolean;
+    holidayType: 'weekend' | 'national' | 'semester' | null;
+  }> = [];
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
+    const dow = new Date(Date.UTC(yearNum, monthNum - 1, d)).getUTCDay();
+    const isWeekend = dow === 0 || dow === 6;
+
+    let holidayType: 'weekend' | 'national' | 'semester' | null = isWeekend ? 'weekend' : null;
+    for (const cal of calendars) {
+      if (cal.isHoliday && dateStr >= cal.startDate && dateStr <= cal.endDate) {
+        holidayType = cal.category.toLowerCase().includes('semester') ? 'semester' : 'national';
+        break;
+      }
+    }
+    dailyCalendar.push({ day: d, date: dateStr, isWeekend, holidayType });
+  }
+
+  const learningDaysCount = dailyCalendar.filter((d) => d.holidayType === null).length;
+
+  const STATUS_ABBR: Record<string, string> = {
+    Hadir: 'H',
+    Izin: 'I',
+    Sakit: 'S',
+    'Dinas Luar': 'DL',
+    Cuti: 'CT',
+    Alpa: 'TK',
+  };
+
+  const dailyMatrixRows = teacherList.map((t) => {
+    const tAtt = monthlyAttRows.filter((r) => r.teacherId === t.id);
+    const dailyStatuses: Record<number, string> = {};
+    let hadir = 0;
+    let izin = 0;
+    let sakit = 0;
+    let dinasLuar = 0;
+    let cuti = 0;
+    let alpa = 0;
+
+    for (const r of tAtt) {
+      const dayNum = Number(r.date.slice(8, 10));
+      const abbr = STATUS_ABBR[r.status] || '';
+      if (dayNum >= 1 && dayNum <= daysInMonth && abbr) {
+        dailyStatuses[dayNum] = abbr;
+      }
+      if (abbr === 'H') hadir += 1;
+      else if (abbr === 'I') izin += 1;
+      else if (abbr === 'S') sakit += 1;
+      else if (abbr === 'DL') dinasLuar += 1;
+      else if (abbr === 'CT') cuti += 1;
+      else if (abbr === 'TK') alpa += 1;
+    }
+
+    return {
+      teacherId: t.id,
+      fullName: t.fullName,
+      nip: t.nip || '-',
+      gender: t.gender || 'L',
+      education: t.education || '-',
+      specialization: t.specialization || 'Guru',
+      employmentStatus: t.employmentStatus || 'PNS',
+      dailyStatuses,
+      counts: { hadir, izin, sakit, dinasLuar, cuti, alpa },
+    };
+  });
 
   const weeklyHoursByTeacher = new Map<number, number>();
   for (const a of assignments) {
@@ -396,6 +534,10 @@ export async function GET(req: NextRequest) {
     ...baseMeta,
     doc: docParam,
     month: monthParam,
+    resolvedMonth,
+    learningDaysCount,
+    dailyCalendar,
+    dailyMatrixRows,
     effectiveWorkDays: metrics.effectiveWorkDays,
     teacherSummary: metrics.rows,
     recentAttendanceLogs: recentLogs,

@@ -6,14 +6,60 @@ import type { RankedStudentEntry, TeacherTppSummaryRow } from '@/lib/server/serv
 export interface PrintSchoolInfo {
   name: string;
   npsn: string;
+  jenjang?: string;
   address: string;
+  village?: string;
   district: string;
   regency: string;
   province: string;
+  postalCode?: string | null;
+  website?: string | null;
+  email?: string | null;
   principalName: string;
   principalNip: string;
   logoUrl?: string | null;
   enableKeasramaan?: boolean;
+}
+
+export interface DailyCalendarDay {
+  day: number;
+  date: string;
+  isWeekend: boolean;
+  holidayType: 'weekend' | 'national' | 'semester' | null;
+}
+
+export interface TeacherDailyMatrixRow {
+  teacherId: number;
+  fullName: string;
+  nip: string;
+  gender: string;
+  education: string;
+  specialization: string;
+  employmentStatus: string;
+  dailyStatuses: Record<number, string>;
+  counts: {
+    hadir: number;
+    izin: number;
+    sakit: number;
+    dinasLuar: number;
+    cuti: number;
+    alpa: number;
+  };
+}
+
+export interface JournalPrintRow {
+  id: number;
+  date: string;
+  lessonHour: string;
+  className: string;
+  subjectName: string;
+  teacherName: string;
+  material: string;
+  objectiveSummary?: string;
+  activities: string;
+  completionStatus: string;
+  notes?: string;
+  attendanceSummary?: string;
 }
 
 export interface PrintClassInfo {
@@ -167,88 +213,111 @@ function KopSekolah({
 
 export function CoverRaporSheet({
   school,
-  academicYear,
   student,
   pageBreak,
 }: {
   school: PrintSchoolInfo;
-  academicYear: string;
+  academicYear?: string;
   student: PrintStudentBiodata;
   pageBreak?: boolean;
 }) {
+  const jenjangLabel = (school.jenjang || 'SEKOLAH DASAR (SD)').toUpperCase();
+
   return (
-    <article
-      className={`bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto max-w-[210mm] min-h-[275mm] p-10 flex flex-col justify-between print:border-0 print:shadow-none print:p-6 ${
-        pageBreak ? 'rapor-page-break' : ''
-      }`}
-    >
-      <div className="border-4 border-double border-slate-900 p-8 sm:p-12 flex-1 flex flex-col items-center justify-between text-center">
-        <div className="space-y-2 pt-4">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-700">
-            KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH
-          </p>
-          <p className="text-xs font-bold uppercase tracking-[0.15em] text-slate-600">
-            REPUBLIK INDONESIA
-          </p>
-          <div className="pt-4">
-            <h1 className="text-2xl font-bold uppercase tracking-wide text-slate-900">
-              RAPOR PESERTA DIDIK
-            </h1>
-            <p className="text-sm font-semibold uppercase text-slate-700 mt-1">
-              KURIKULUM MERDEKA · PENDIDIKAN DASAR
-            </p>
-          </div>
+    <>
+      {/* Halaman 1: Sampul Depan */}
+      <article className="print-portrait bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[210mm] min-h-[275mm] px-12 py-14 flex flex-col items-center justify-between text-center print:border-0 print:shadow-none print:px-8 print:py-10 rapor-page-break">
+        <div className="space-y-1.5 pt-4">
+          <p className="text-xl font-bold uppercase tracking-[0.35em] text-black">LAPORAN</p>
+          <p className="text-base font-bold uppercase text-black">HASIL BELAJAR MURID</p>
+          <p className="text-base font-bold uppercase text-black">{school.name}</p>
         </div>
 
-        <div className="my-8 flex flex-col items-center gap-4">
+        <div className="my-10 flex items-center justify-center">
           <img
             src="/api/school/logo"
             alt="Lambang Sekolah"
             referrerPolicy="no-referrer"
-            className="w-32 h-32 object-cover rounded-lg border border-slate-300"
+            className="w-36 h-36 object-contain"
           />
-          <div>
-            <p className="text-base font-bold uppercase text-slate-900">{school.name}</p>
-            <p className="text-xs font-mono text-slate-700">NPSN: {school.npsn}</p>
-          </div>
         </div>
 
-        <div className="w-full max-w-md space-y-5">
+        <div className="w-full max-w-[430px] space-y-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-1.5">
-              Nama Peserta Didik:
-            </p>
-            <div className="border-2 border-slate-900 py-3 px-4">
-              <p className="text-base font-bold uppercase tracking-wide text-slate-900">
+            <p className="text-xs text-black mb-1.5">Nama Murid</p>
+            <div className="border border-black py-2.5 px-4">
+              <p className="text-sm font-bold uppercase tracking-wide text-black">
                 {student.fullName}
               </p>
             </div>
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-1.5">
-              NIS / NISN:
-            </p>
-            <div className="border-2 border-slate-900 py-2.5 px-4">
-              <p className="text-sm font-mono font-bold tabular-nums text-slate-900">
-                {student.nis} / {student.nisn}
+            <p className="text-xs text-black mb-1.5">NISN / NIS</p>
+            <div className="border border-black py-2.5 px-4">
+              <p className="text-sm font-bold tabular-nums text-black">
+                {student.nisn} / {student.nis}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="pt-8 space-y-1">
-          <p className="text-xs font-bold uppercase text-slate-900">{school.name}</p>
-          <p className="text-xs text-slate-700">
-            {school.address}, Kec. {school.district}, {school.regency}
+        <div className="pt-10 pb-2 space-y-1">
+          <p className="text-sm font-bold uppercase text-black">
+            KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH
           </p>
-          <p className="text-xs text-slate-700">{school.province}</p>
-          <p className="text-xs font-semibold font-mono pt-2 text-slate-800">
-            TAHUN AJARAN {academicYear}
-          </p>
+          <p className="text-sm font-bold uppercase text-black">REPUBLIK INDONESIA</p>
         </div>
-      </div>
-    </article>
+      </article>
+
+      {/* Halaman 2: Identitas Satuan Pendidikan */}
+      <article
+        className={`print-portrait relative overflow-hidden bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[210mm] min-h-[275mm] px-12 py-14 print:border-0 print:shadow-none print:px-8 print:py-10 ${
+          pageBreak ? 'rapor-page-break' : ''
+        }`}
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none select-none absolute inset-0 flex items-center justify-center opacity-[0.09]"
+        >
+          <img
+            src="/api/school/logo"
+            alt=""
+            referrerPolicy="no-referrer"
+            className="w-72 h-72 object-contain grayscale"
+          />
+        </div>
+
+        <div className="relative z-10 text-center space-y-1.5 mb-12 pt-4">
+          <p className="text-xl font-bold uppercase tracking-[0.35em] text-black">LAPORAN</p>
+          <p className="text-base font-bold uppercase text-black">HASIL BELAJAR MURID</p>
+          <p className="text-base font-normal uppercase text-black">{jenjangLabel}</p>
+        </div>
+
+        <table className="relative z-10 w-full max-w-[540px] mx-auto border-collapse text-xs text-black">
+          <tbody>
+            {[
+              ['Nama Sekolah', school.name],
+              ['NPSN', school.npsn],
+              ['Alamat Sekolah', school.address],
+              ['Kode Pos', school.postalCode || '—'],
+              ['Desa / Kelurahan', school.village || '—'],
+              ['Kecamatan', school.district || '—'],
+              ['Kabupaten / Kota', school.regency || '—'],
+              ['Provinsi', school.province || '—'],
+              ['Website', school.website || '—'],
+              ['E-mail', school.email || '—'],
+            ].map(([label, value]) => (
+              <tr key={label}>
+                <td className="py-2 pr-4 w-48 font-bold align-top">{label}</td>
+                <td className="py-2 pr-2 w-4 align-top">:</td>
+                <td className="py-2 align-top">{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </article>
+    </>
   );
 }
 
@@ -453,13 +522,132 @@ export function PiagamPrestasiSheet({
   );
 }
 
+function formatIndoDate(isoDate: string): string {
+  if (!isoDate) return '-';
+  const parts = isoDate.split('-');
+  if (parts.length !== 3) return isoDate;
+  const months = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+  const mIdx = Number(parts[1]) - 1;
+  const d = Number(parts[2]);
+  if (!months[mIdx] || !Number.isFinite(d)) return isoDate;
+  return `${d} ${months[mIdx]} ${parts[0]}`;
+}
+
+function formatMonthTitle(yyyyMm: string): string {
+  if (!yyyyMm || !/^\d{4}-\d{2}$/.test(yyyyMm)) return yyyyMm || 'Bulan Aktif';
+  const [y, m] = yyyyMm.split('-');
+  const months = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+  return `${months[Number(m) - 1] || m} ${y}`;
+}
+
+function formatEndOfMonthDate(yyyyMm: string): string {
+  if (!yyyyMm || !/^\d{4}-\d{2}$/.test(yyyyMm)) return '';
+  const [y, m] = yyyyMm.split('-');
+  const lastDay = new Date(Number(y), Number(m), 0).getDate();
+  return formatIndoDate(`${y}-${m}-${String(lastDay).padStart(2, '0')}`);
+}
+
+function RaporIdentitasHeader({
+  school,
+  academicYear,
+  semesterName,
+  cls,
+  student,
+}: {
+  school: PrintSchoolInfo;
+  academicYear: string;
+  semesterName: string;
+  cls: PrintClassInfo;
+  student: ReportCardData['student'];
+}) {
+  const fullSchoolAddress = [
+    school.address,
+    school.village ? `Desa ${school.village}` : '',
+    school.district ? `Kecamatan ${school.district}` : '',
+    school.regency,
+    school.province,
+  ]
+    .filter(Boolean)
+    .join(', ');
+
+  return (
+    <table className="w-full border-collapse text-xs text-black my-4">
+      <tbody>
+        <tr>
+          <td className="py-0.5 pr-2 w-[96px] font-bold whitespace-nowrap align-top">
+            Nama Murid
+          </td>
+          <td className="py-0.5 pr-1.5 w-3 align-top">:</td>
+          <td className="py-0.5 pr-6 font-bold uppercase align-top">{student.fullName}</td>
+          <td className="py-0.5 pr-2 w-[96px] font-bold whitespace-nowrap align-top">Kelas</td>
+          <td className="py-0.5 pr-1.5 w-3 align-top">:</td>
+          <td className="py-0.5 w-[110px] align-top">{cls.name}</td>
+        </tr>
+        <tr>
+          <td className="py-0.5 pr-2 font-bold whitespace-nowrap align-top">NIS / NISN</td>
+          <td className="py-0.5 pr-1.5 align-top">:</td>
+          <td className="py-0.5 pr-6 tabular-nums align-top">
+            {student.nis} / {student.nisn}
+          </td>
+          <td className="py-0.5 pr-2 font-bold whitespace-nowrap align-top">Fase</td>
+          <td className="py-0.5 pr-1.5 align-top">:</td>
+          <td className="py-0.5 align-top">{cls.fase}</td>
+        </tr>
+        <tr>
+          <td className="py-0.5 pr-2 font-bold whitespace-nowrap align-top">Sekolah</td>
+          <td className="py-0.5 pr-1.5 align-top">:</td>
+          <td className="py-0.5 pr-6 uppercase align-top">{school.name}</td>
+          <td className="py-0.5 pr-2 font-bold whitespace-nowrap align-top">Semester</td>
+          <td className="py-0.5 pr-1.5 align-top">:</td>
+          <td className="py-0.5 align-top">{semesterName}</td>
+        </tr>
+        <tr>
+          <td className="py-0.5 pr-2 font-bold whitespace-nowrap align-top">Alamat</td>
+          <td className="py-0.5 pr-1.5 align-top">:</td>
+          <td className="py-0.5 pr-6 align-top leading-snug">
+            {fullSchoolAddress || school.regency}
+          </td>
+          <td className="py-0.5 pr-2 font-bold whitespace-nowrap align-top">Tahun Ajaran</td>
+          <td className="py-0.5 pr-1.5 align-top">:</td>
+          <td className="py-0.5 tabular-nums align-top">{academicYear}</td>
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
 export function RaporAkademikSheet({
   school,
   academicYear,
   semester,
   cls,
   rep,
-  availableDecisions,
   pageBreak,
 }: {
   school: PrintSchoolInfo;
@@ -471,84 +659,62 @@ export function RaporAkademikSheet({
   pageBreak?: boolean;
 }) {
   const subjectGroups = groupSubjects(rep.subjectGrades);
-  const decisions =
-    rep.availableDecisions || availableDecisions || ['Naik Kelas', 'Tinggal Kelas'];
 
   return (
     <article
-      className={`bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0 ${
+      className={`print-portrait bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0 ${
         pageBreak ? 'rapor-page-break' : ''
       }`}
     >
-      <KopSekolah school={school} title="LAPORAN HASIL BELAJAR PESERTA DIDIK (RAPOR)" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-[7.5rem_auto_1fr_7.5rem_auto_auto] gap-x-2 gap-y-1 text-xs my-4">
-        <span className="text-slate-600">Nama Murid</span>
-        <span>:</span>
-        <span className="font-semibold uppercase">{rep.student.fullName}</span>
-        <span className="text-slate-600">Kelas</span>
-        <span>:</span>
-        <span className="font-semibold">{cls.name}</span>
-
-        <span className="text-slate-600">NIS / NISN</span>
-        <span>:</span>
-        <span className="font-mono tabular-nums">
-          {rep.student.nis} / {rep.student.nisn}
-        </span>
-        <span className="text-slate-600">Fase</span>
-        <span>:</span>
-        <span className="font-semibold">{cls.fase}</span>
-
-        <span className="text-slate-600">Sekolah</span>
-        <span>:</span>
-        <span>{school.name}</span>
-        <span className="text-slate-600">Semester</span>
-        <span>:</span>
-        <span>{semester.name}</span>
-
-        <span className="text-slate-600">Alamat Murid</span>
-        <span>:</span>
-        <span>{rep.student.address || school.regency}</span>
-        <span className="text-slate-600">Tahun Ajaran</span>
-        <span>:</span>
-        <span className="font-mono tabular-nums">{academicYear}</span>
+      <div className="text-center mb-3">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-black">
+          LAPORAN HASIL BELAJAR
+        </h2>
+        <p className="text-xs text-black mt-0.5">(RAPOR)</p>
       </div>
 
-      <h3 className="text-xs font-bold uppercase text-slate-900 mb-2">
-        A. Nilai dan Capaian Kompetensi Intrakurikuler
-      </h3>
-      <table className="rapor-table w-full border-collapse border border-slate-800 text-xs mb-5">
+      <RaporIdentitasHeader
+        school={school}
+        academicYear={academicYear}
+        semesterName={semester.name}
+        cls={cls}
+        student={rep.student}
+      />
+
+      {/* Tabel Nilai Intrakurikuler */}
+      <table className="rapor-table w-full border-collapse border border-black text-xs mb-4">
         <thead>
-          <tr className="bg-slate-100">
-            <th className="border border-slate-800 py-2 px-2 text-center w-10">No</th>
-            <th className="border border-slate-800 py-2 px-2.5 text-left w-44">Mata Pelajaran</th>
-            <th className="border border-slate-800 py-2 px-2 text-center w-20">Nilai Akhir</th>
-            <th className="border border-slate-800 py-2 px-2.5 text-left">Capaian Kompetensi</th>
+          <tr>
+            <th className="border border-black py-2 px-2 text-center font-bold w-10">No</th>
+            <th className="border border-black py-2 px-2.5 text-center font-bold w-44">
+              Mata Pelajaran
+            </th>
+            <th className="border border-black py-2 px-2 text-center font-bold w-20">
+              Nilai Akhir
+            </th>
+            <th className="border border-black py-2 px-2.5 text-center font-bold">
+              Capaian Kompetensi
+            </th>
           </tr>
         </thead>
         <tbody>
           {subjectGroups.map((group) => (
             <React.Fragment key={group.title}>
-              <tr className="bg-slate-50">
-                <td
-                  colSpan={4}
-                  className="border border-slate-800 py-1.5 px-2.5 font-bold text-slate-900"
-                >
+              <tr>
+                <td colSpan={4} className="border border-black py-1.5 px-2.5 font-bold text-black">
                   {group.title}
                 </td>
               </tr>
               {group.items.map((g, gIdx) => (
                 <tr key={g.subjectId} className={gIdx === 0 ? 'first-data-row' : undefined}>
-                  <td className="border border-slate-800 py-2 px-2 text-center font-mono tabular-nums align-top">
+                  <td className="border border-black py-2 px-2 text-center tabular-nums align-top">
                     {g.no}
                   </td>
-                  <td className="border border-slate-800 py-2 px-2.5 font-medium align-top">
-                    {g.subjectName}
-                  </td>
-                  <td className="border border-slate-800 py-2 px-2 text-center font-mono tabular-nums font-bold align-top">
+                  <td className="border border-black py-2 px-2.5 align-top">{g.subjectName}</td>
+                  <td className="border border-black py-2 px-2 text-center tabular-nums align-top">
                     {g.finalScore !== null ? g.finalScore : '-'}
                   </td>
-                  <td className="border border-slate-800 py-2 px-2.5 leading-relaxed align-top">
+                  <td className="border border-black py-2 px-2.5 leading-snug align-top">
                     <div className="space-y-1 text-justify">
                       <p>{g.achievedParagraph || g.competencyDescription}</p>
                       {g.needsGuidanceParagraph && <p>{g.needsGuidanceParagraph}</p>}
@@ -561,178 +727,170 @@ export function RaporAkademikSheet({
         </tbody>
       </table>
 
+      {/* Kokurikuler (Box Penuh Satu Kolom Sesuai Contoh PDF) */}
       {rep.cocurriculars.length > 0 && (
-        <div className="mb-5">
-          <h3 className="text-xs font-bold uppercase text-slate-900 mb-2">
-            B. Capaian Kokurikuler (8 Dimensi Profil Lulusan)
-          </h3>
-          <table className="rapor-table w-full border-collapse border border-slate-800 text-xs">
+        <table className="rapor-table w-full border-collapse border border-black text-xs mb-4">
+          <thead>
+            <tr>
+              <th className="border border-black py-1.5 px-2.5 text-center font-bold">
+                Kokurikuler
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="first-data-row">
+              <td className="border border-black py-2.5 px-3 leading-snug text-justify space-y-1.5">
+                {rep.cocurriculars.map((c) => (
+                  <p key={c.code}>{c.description}</p>
+                ))}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
+
+      {/* Ekstrakurikuler (3 Kolom: No | Ekstrakurikuler | Keterangan) */}
+      <table className="rapor-table w-full border-collapse border border-black text-xs mb-4">
+        <thead>
+          <tr>
+            <th className="border border-black py-1.5 px-2 text-center font-bold w-10">No</th>
+            <th className="border border-black py-1.5 px-2.5 text-center font-bold w-44">
+              Ekstrakurikuler
+            </th>
+            <th className="border border-black py-1.5 px-2.5 text-center font-bold">Keterangan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rep.extracurriculars.length === 0 ? (
+            <tr className="first-data-row">
+              <td className="border border-black py-2 px-2 text-center">1</td>
+              <td className="border border-black py-2 px-2.5">-</td>
+              <td className="border border-black py-2 px-2.5">
+                Belum ada keikutsertaan ekstrakurikuler tercatat.
+              </td>
+            </tr>
+          ) : (
+            rep.extracurriculars.map((e, i) => (
+              <tr key={e.name} className={i === 0 ? 'first-data-row' : undefined}>
+                <td className="border border-black py-2 px-2 text-center tabular-nums align-top">
+                  {i + 1}
+                </td>
+                <td className="border border-black py-2 px-2.5 align-top">{e.name}</td>
+                <td className="border border-black py-2 px-2.5 text-justify align-top">
+                  {e.description && e.description !== '-'
+                    ? e.description
+                    : `Predikat ${e.predicate} dalam kegiatan ${e.name.toLowerCase()}.`}
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+
+      {/* Ketidakhadiran & Catatan Wali Kelas Berdampingan */}
+      <div className="grid grid-cols-12 gap-4 mb-4">
+        <div className="col-span-5">
+          <table className="w-full border-collapse border border-black text-xs">
             <thead>
-              <tr className="bg-slate-100">
-                <th className="border border-slate-800 py-1.5 px-2.5 text-left w-52">
-                  Projek / Kegiatan
-                </th>
-                <th className="border border-slate-800 py-1.5 px-2 text-center w-24">Predikat</th>
-                <th className="border border-slate-800 py-1.5 px-2.5 text-left">
-                  Deskripsi Capaian
+              <tr>
+                <th colSpan={2} className="border border-black py-1.5 px-2.5 text-center font-bold">
+                  Ketidakhadiran
                 </th>
               </tr>
             </thead>
             <tbody>
-              {rep.cocurriculars.map((c, cIdx) => (
-                <tr key={c.code} className={cIdx === 0 ? 'first-data-row' : undefined}>
-                  <td className="border border-slate-800 py-2 px-2.5 font-medium align-top">
-                    {c.title}
-                  </td>
-                  <td className="border border-slate-800 py-2 px-2 text-center font-semibold align-top">
-                    {c.predicate}
-                  </td>
-                  <td className="border border-slate-800 py-2 px-2.5 leading-relaxed align-top">
-                    <div className="text-justify">{c.description}</div>
-                  </td>
-                </tr>
-              ))}
+              <tr>
+                <td className="border border-black py-1.5 px-2.5">Sakit</td>
+                <td className="border border-black py-1.5 px-2.5 text-center tabular-nums">
+                  {rep.attendance.sakit} Hari
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black py-1.5 px-2.5">Izin</td>
+                <td className="border border-black py-1.5 px-2.5 text-center tabular-nums">
+                  {rep.attendance.izin} Hari
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black py-1.5 px-2.5">Tanpa Keterangan</td>
+                <td className="border border-black py-1.5 px-2.5 text-center tabular-nums">
+                  {rep.attendance.alpa} Hari
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
-      )}
-
-      <div className="mb-5">
-        <h3 className="text-xs font-bold uppercase text-slate-900 mb-2">
-          C. Kegiatan Ekstrakurikuler
-        </h3>
-        <table className="rapor-table w-full border-collapse border border-slate-800 text-xs">
-          <thead>
-            <tr className="bg-slate-100">
-              <th className="border border-slate-800 py-1.5 px-2 text-center w-10">No</th>
-              <th className="border border-slate-800 py-1.5 px-2.5 text-left w-44">Ekstrakurikuler</th>
-              <th className="border border-slate-800 py-1.5 px-2 text-center w-24">Predikat</th>
-              <th className="border border-slate-800 py-1.5 px-2.5 text-left">Keterangan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rep.extracurriculars.length === 0 ? (
-              <tr className="first-data-row">
-                <td className="border border-slate-800 py-2 px-2 text-center">1</td>
-                <td className="border border-slate-800 py-2 px-2.5">-</td>
-                <td className="border border-slate-800 py-2 px-2 text-center">-</td>
-                <td className="border border-slate-800 py-2 px-2.5">
-                  Belum ada keikutsertaan ekstrakurikuler tercatat.
-                </td>
+        <div className="col-span-7 flex flex-col">
+          <table className="w-full border-collapse border border-black text-xs flex-1">
+            <thead>
+              <tr>
+                <th className="border border-black py-1.5 px-2.5 text-center font-bold">
+                  Catatan Wali Kelas
+                </th>
               </tr>
-            ) : (
-              rep.extracurriculars.map((e, i) => (
-                <tr key={e.name} className={i === 0 ? 'first-data-row' : undefined}>
-                  <td className="border border-slate-800 py-2 px-2 text-center font-mono">
-                    {i + 1}
-                  </td>
-                  <td className="border border-slate-800 py-2 px-2.5 font-medium">{e.name}</td>
-                  <td className="border border-slate-800 py-2 px-2 text-center font-semibold">
-                    {e.predicate}
-                  </td>
-                  <td className="border border-slate-800 py-2 px-2.5 text-justify">
-                    {e.description}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 mb-4">
-        <div className="sm:col-span-5">
-          <h3 className="text-xs font-bold uppercase text-slate-900 mb-1.5">D. Ketidakhadiran</h3>
-          <table className="w-full border-collapse border border-slate-800 text-xs">
+            </thead>
             <tbody>
               <tr>
-                <td className="border border-slate-800 py-1.5 px-2.5">Sakit</td>
-                <td className="border border-slate-800 py-1.5 px-2.5 font-mono tabular-nums text-right">
-                  {rep.attendance.sakit} hari
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-800 py-1.5 px-2.5">Izin</td>
-                <td className="border border-slate-800 py-1.5 px-2.5 font-mono tabular-nums text-right">
-                  {rep.attendance.izin} hari
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-800 py-1.5 px-2.5">Tanpa Keterangan</td>
-                <td className="border border-slate-800 py-1.5 px-2.5 font-mono tabular-nums text-right">
-                  {rep.attendance.alpa} hari
+                <td className="border border-black p-2.5 text-xs leading-snug align-top min-h-[76px] h-[78px] text-justify">
+                  {rep.homeroomNote || '—'}
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        <div className="sm:col-span-7">
-          <h3 className="text-xs font-bold uppercase text-slate-900 mb-1.5">
-            E. Catatan Wali Kelas
-          </h3>
-          <div className="border border-slate-800 p-3 text-xs leading-relaxed min-h-[82px] text-justify">
-            {rep.homeroomNote}
-          </div>
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 mb-5">
-        <div className="sm:col-span-8">
-          <h3 className="text-xs font-bold uppercase text-slate-900 mb-1.5">
-            F. Tanggapan Orang Tua / Wali Murid
-          </h3>
-          <div className="border border-slate-800 p-3 text-xs min-h-[72px]" />
-        </div>
-        <div className="sm:col-span-4">
-          <h3 className="text-xs font-bold uppercase text-slate-900 mb-1.5">Keputusan</h3>
-          <div className="border border-slate-800 p-3 text-xs min-h-[72px] space-y-1.5">
-            <p className="text-[11px] text-slate-700">
-              Berdasarkan pencapaian kompetensi, peserta didik ditetapkan:
-            </p>
-            <div className="space-y-1 pt-0.5">
-              {decisions.map((dec) => {
-                const isActive = rep.promotionDecision.toLowerCase() === dec.toLowerCase();
-                return (
-                  <p key={dec} className="font-medium flex items-center gap-1.5">
-                    <span className="font-mono text-sm leading-none">
-                      {isActive ? '☑' : '☐'}
-                    </span>
-                    <span>{dec}</span>
-                  </p>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Tanggapan Orang Tua / Wali */}
+      <table className="w-full border-collapse border border-black text-xs mb-6">
+        <thead>
+          <tr>
+            <th className="border border-black py-1.5 px-2.5 text-center font-bold">
+              Tanggapan Orang Tua / Wali
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="border border-black p-3 h-[72px]" />
+          </tr>
+        </tbody>
+      </table>
 
-      <div className="rapor-signature-block pt-3 text-xs space-y-6">
+      {/* Tanda Tangan */}
+      <div className="rapor-signature-block pt-2 text-xs space-y-6">
         <div className="grid grid-cols-2 gap-8">
           <div className="text-center">
-            <p>Mengetahui,</p>
-            <p>Orang Tua / Wali Murid</p>
-            <div className="h-16" />
-            <p className="font-semibold border-b border-slate-700 inline-block min-w-[160px]">
-              {rep.student.fatherName || rep.student.motherName || '..............................'}
-            </p>
+            <p className="invisible">Tanggal</p>
+            <p className="font-bold">Orang Tua / Wali Murid</p>
+            <div className="h-20" />
+            <p className="font-bold">____________________</p>
           </div>
           <div className="text-center">
             <p>
               {school.regency}, {semester.reportDate}
             </p>
-            <p>Wali Kelas {cls.name}</p>
-            <div className="h-16" />
-            <p className="font-semibold underline">{cls.homeroomTeacherName || 'Wali Kelas'}</p>
-            <p className="font-mono text-[11px]">NIP {cls.homeroomTeacherNip || '-'}</p>
+            <p className="font-bold">Wali Kelas</p>
+            <div className="h-20" />
+            <p className="font-bold underline">{cls.homeroomTeacherName || 'Wali Kelas'}</p>
+            <p className="text-[11px]">{cls.homeroomTeacherNip || '-'}</p>
           </div>
         </div>
         <div className="text-center">
-          <p>Mengetahui,</p>
-          <p>Kepala Sekolah</p>
-          <div className="h-16" />
-          <p className="font-semibold underline">{school.principalName}</p>
-          <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
+          <p className="font-bold">Kepala Sekolah</p>
+          <div className="h-20" />
+          <p className="font-bold underline">{school.principalName}</p>
+          <p className="text-[11px]">{school.principalNip || '-'}</p>
         </div>
+      </div>
+
+      {/* Footer Identitas Murid */}
+      <div className="mt-8 pt-2 flex items-center justify-between text-[11px] text-slate-600">
+        <span>
+          {cls.name} | {rep.student.fullName} | {rep.student.nis}
+        </span>
+        <span>
+          {school.name} · {academicYear}
+        </span>
       </div>
     </article>
   );
@@ -757,166 +915,168 @@ export function RaporKeasramaanSheet({
 
   return (
     <article
-      className={`bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0 ${
+      className={`print-portrait relative overflow-hidden bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0 ${
         pageBreak ? 'rapor-page-break' : ''
       }`}
     >
-      <KopSekolah school={school} title="LAPORAN CAPAIAN PEMBINAAN KEASRAMAAN" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-[7.5rem_auto_1fr_7.5rem_auto_auto] gap-x-2 gap-y-1 text-xs my-4">
-        <span className="text-slate-600">Nama Murid</span>
-        <span>:</span>
-        <span className="font-semibold uppercase">{rep.student.fullName}</span>
-        <span className="text-slate-600">Kelas</span>
-        <span>:</span>
-        <span className="font-semibold">{cls.name}</span>
-
-        <span className="text-slate-600">NIS / NISN</span>
-        <span>:</span>
-        <span className="font-mono tabular-nums">
-          {rep.student.nis} / {rep.student.nisn}
-        </span>
-        <span className="text-slate-600">Fase</span>
-        <span>:</span>
-        <span className="font-semibold">{cls.fase}</span>
-
-        <span className="text-slate-600">Sekolah</span>
-        <span>:</span>
-        <span>{school.name}</span>
-        <span className="text-slate-600">Semester</span>
-        <span>:</span>
-        <span>{semester.name}</span>
-
-        <span className="text-slate-600">Alamat Murid</span>
-        <span>:</span>
-        <span>{rep.student.address || school.regency}</span>
-        <span className="text-slate-600">Tahun Ajaran</span>
-        <span>:</span>
-        <span className="font-mono tabular-nums">{academicYear}</span>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none select-none absolute inset-0 flex items-center justify-center opacity-[0.08]"
+      >
+        <img
+          src="/api/school/logo"
+          alt=""
+          referrerPolicy="no-referrer"
+          className="w-72 h-72 object-contain"
+        />
       </div>
 
-      <h3 className="text-xs font-bold uppercase text-slate-900 mb-2">
-        A. Capaian Indikator Pembinaan Keasramaan
-      </h3>
-      <table className="rapor-table w-full border-collapse border border-slate-800 text-xs mb-5">
-        <thead>
-          <tr className="bg-slate-100">
-            <th className="border border-slate-800 py-2 px-2 text-center w-10">No</th>
-            <th className="border border-slate-800 py-2 px-2.5 text-left w-48">
-              Indikator Pembinaan
-            </th>
-            <th className="border border-slate-800 py-2 px-2 text-center w-20">Predikat</th>
-            <th className="border border-slate-800 py-2 px-2.5 text-left">Deskripsi Capaian</th>
-          </tr>
-        </thead>
-        <tbody>
-          {keasGroups.length === 0 ? (
+      <div className="relative z-10">
+        <div className="text-center mb-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-black">
+            LAPORAN KEGIATAN KEASRAMAAN
+          </h2>
+          <p className="text-xs text-black mt-0.5">(RAPOR)</p>
+        </div>
+
+        <RaporIdentitasHeader
+          school={school}
+          academicYear={academicYear}
+          semesterName={semester.name}
+          cls={cls}
+          student={rep.student}
+        />
+
+        <table className="rapor-table w-full border-collapse border border-black text-xs mb-4">
+          <thead>
             <tr>
-              <td colSpan={4} className="border border-slate-800 py-3 px-3 text-center text-slate-500">
-                Belum ada indikator keasramaan aktif untuk semester ini.
-              </td>
+              <th className="border border-black py-2 px-2 text-center font-bold w-10">No</th>
+              <th className="border border-black py-2 px-2.5 text-center font-bold w-48">
+                Indikator
+              </th>
+              <th className="border border-black py-2 px-2 text-center font-bold w-20">
+                Predikat
+              </th>
+              <th className="border border-black py-2 px-2.5 text-center font-bold">Deskripsi</th>
             </tr>
-          ) : (
-            keasGroups.map((grp) => (
-              <React.Fragment key={grp.title}>
-                <tr className="bg-slate-50">
-                  <td
-                    colSpan={4}
-                    className="border border-slate-800 py-1.5 px-2.5 font-bold text-slate-900"
-                  >
-                    {grp.title}
-                  </td>
-                </tr>
-                {grp.items.map((item, iIdx) => (
-                  <tr key={item.indicatorId} className={iIdx === 0 ? 'first-data-row' : undefined}>
-                    <td className="border border-slate-800 py-2 px-2 text-center font-mono tabular-nums align-top">
-                      {iIdx + 1}
-                    </td>
-                    <td className="border border-slate-800 py-2 px-2.5 font-medium align-top">
-                      {item.name}
-                    </td>
-                    <td className="border border-slate-800 py-2 px-2 text-center font-bold align-top">
-                      {item.predicate}
-                    </td>
-                    <td className="border border-slate-800 py-2 px-2.5 leading-relaxed align-top">
-                      <div className="space-y-1 text-justify">
-                        <p>{item.achievedNote}</p>
-                        {item.guidanceNote && <p>{item.guidanceNote}</p>}
-                      </div>
+          </thead>
+          <tbody>
+            {keasGroups.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="border border-black py-3 px-3 text-center text-slate-600">
+                  Belum ada indikator keasramaan aktif untuk semester ini.
+                </td>
+              </tr>
+            ) : (
+              keasGroups.map((grp) => (
+                <React.Fragment key={grp.title}>
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="border border-black py-1.5 px-2.5 font-bold text-black"
+                    >
+                      {grp.title}
                     </td>
                   </tr>
-                ))}
-              </React.Fragment>
-            ))
-          )}
-        </tbody>
-      </table>
+                  {grp.items.map((item, iIdx) => (
+                    <tr key={item.indicatorId} className={iIdx === 0 ? 'first-data-row' : undefined}>
+                      <td className="border border-black py-2 px-2 text-center tabular-nums align-top">
+                        {iIdx + 1}
+                      </td>
+                      <td className="border border-black py-2 px-2.5 align-top">{item.name}</td>
+                      <td className="border border-black py-2 px-2 text-center align-top">
+                        {item.predicate}
+                      </td>
+                      <td className="border border-black py-2 px-2.5 leading-snug align-top">
+                        <div className="space-y-1 text-justify">
+                          <p>{item.achievedNote}</p>
+                          {item.guidanceNote && <p>{item.guidanceNote}</p>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
+              ))
+            )}
+          </tbody>
+        </table>
 
-      <div className="max-w-xs mb-6">
-        <h3 className="text-xs font-bold uppercase text-slate-900 mb-1.5">
-          B. Ketidakhadiran Kegiatan Asrama
-        </h3>
-        <table className="w-full border-collapse border border-slate-800 text-xs">
+        {/* Ketidakhadiran Lebar Penuh Sesuai Contoh PDF */}
+        <table className="w-full border-collapse border border-black text-xs mb-6">
+          <thead>
+            <tr>
+              <th colSpan={2} className="border border-black py-1.5 px-2.5 text-center font-bold">
+                Ketidakhadiran
+              </th>
+            </tr>
+          </thead>
           <tbody>
             <tr>
-              <td className="border border-slate-800 py-1.5 px-2.5">Sakit</td>
-              <td className="border border-slate-800 py-1.5 px-2.5 font-mono tabular-nums text-right">
-                {rep.attendance.sakit} hari
+              <td className="border border-black py-1.5 px-3 w-[65%]">Sakit</td>
+              <td className="border border-black py-1.5 px-3 text-center tabular-nums">
+                {rep.attendance.sakit} Hari
               </td>
             </tr>
             <tr>
-              <td className="border border-slate-800 py-1.5 px-2.5">Izin</td>
-              <td className="border border-slate-800 py-1.5 px-2.5 font-mono tabular-nums text-right">
-                {rep.attendance.izin} hari
+              <td className="border border-black py-1.5 px-3">Izin</td>
+              <td className="border border-black py-1.5 px-3 text-center tabular-nums">
+                {rep.attendance.izin} Hari
               </td>
             </tr>
             <tr>
-              <td className="border border-slate-800 py-1.5 px-2.5">Tanpa Keterangan</td>
-              <td className="border border-slate-800 py-1.5 px-2.5 font-mono tabular-nums text-right">
-                {rep.attendance.alpa} hari
+              <td className="border border-black py-1.5 px-3">Tanpa Keterangan</td>
+              <td className="border border-black py-1.5 px-3 text-center tabular-nums">
+                {rep.attendance.alpa} Hari
               </td>
             </tr>
           </tbody>
         </table>
-      </div>
 
-      <div className="rapor-signature-block pt-4 text-xs space-y-6">
-        <div className="grid grid-cols-2 gap-8">
-          <div className="text-center">
-            <p>Mengetahui,</p>
-            <p>Wali Asrama</p>
-            <div className="h-16" />
-            <p className="font-semibold underline">
-              {rep.keasramaanSigners?.waliAsramaName || 'Pembina Asrama'}
-            </p>
+        <div className="rapor-signature-block pt-2 text-xs space-y-10">
+          <div className="grid grid-cols-2 gap-8">
+            <div className="text-center">
+              <p className="invisible">Tanggal</p>
+              <p className="font-bold">Wali Asrama</p>
+              <div className="h-20" />
+              <p className="font-bold underline">
+                {rep.keasramaanSigners?.waliAsramaName || 'Pembina Asrama'}
+              </p>
+              <p className="text-[11px]">-</p>
+            </div>
+            <div className="text-center">
+              <p>
+                {school.regency}, {semester.reportDate}
+              </p>
+              <p className="font-bold">Wali Asuh</p>
+              <div className="h-20" />
+              <p className="font-bold underline">
+                {rep.keasramaanSigners?.waliAsuhName || 'Wali Asuh'}
+              </p>
+              <p className="text-[11px]">-</p>
+            </div>
           </div>
-          <div className="text-center">
-            <p>
-              {school.regency}, {semester.reportDate}
-            </p>
-            <p>Wali Asuh</p>
-            <div className="h-16" />
-            <p className="font-semibold underline">
-              {rep.keasramaanSigners?.waliAsuhName || 'Wali Asuh'}
-            </p>
+          <div className="grid grid-cols-2 gap-8">
+            <div className="text-center">
+              <p className="font-bold">Orang Tua / Wali Murid</p>
+              <div className="h-20" />
+              <p className="font-bold">____________________</p>
+            </div>
+            <div className="text-center">
+              <p className="font-bold">Kepala Sekolah</p>
+              <div className="h-20" />
+              <p className="font-bold underline">{school.principalName}</p>
+              <p className="text-[11px]">{school.principalNip || '-'}</p>
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-8">
-          <div className="text-center">
-            <p>Mengetahui,</p>
-            <p>Orang Tua / Wali Murid</p>
-            <div className="h-16" />
-            <p className="font-semibold border-b border-slate-700 inline-block min-w-[160px]">
-              {rep.student.fatherName || rep.student.motherName || '..............................'}
-            </p>
-          </div>
-          <div className="text-center">
-            <p>Mengetahui,</p>
-            <p>Kepala Sekolah</p>
-            <div className="h-16" />
-            <p className="font-semibold underline">{school.principalName}</p>
-            <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
-          </div>
+
+        <div className="mt-8 pt-2 flex items-center justify-between text-[11px] text-slate-600">
+          <span>
+            {cls.name} | {rep.student.fullName} | {rep.student.nis}
+          </span>
+          <span>
+            {school.name} · {academicYear}
+          </span>
         </div>
       </div>
     </article>
@@ -936,65 +1096,90 @@ export function JurnalMengajarPrintSheet({
   semester: { name: string; reportDate: string };
   cls: PrintClassInfo | null;
   monthLabel: string;
-  journals: Array<{
-    id: number;
-    date: string;
-    lessonHour: string;
-    className: string;
-    subjectName: string;
-    teacherName: string;
-    material: string;
-    activities: string;
-    completionStatus: string;
-  }>;
+  journals: JournalPrintRow[];
 }) {
-  return (
-    <article className="bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0">
-      <KopSekolah
-        school={school}
-        title="REKAPITULASI JURNAL MENGAJAR GURU"
-        subtitle={`Tahun Ajaran ${academicYear} · ${semester.name}${cls ? ` · Kelas ${cls.name}` : ''} · Periode ${monthLabel}`}
-      />
+  const uniqueTeachers = Array.from(new Set(journals.map((j) => j.teacherName).filter(Boolean)));
+  const teacherDisplay =
+    uniqueTeachers.length === 1
+      ? uniqueTeachers[0]
+      : cls?.homeroomTeacherName || uniqueTeachers[0] || 'Guru Kelas / Mapel';
 
-      <table className="rapor-table w-full border-collapse border border-slate-800 text-xs my-5">
+  const dates = journals
+    .map((j) => j.date)
+    .filter(Boolean)
+    .sort();
+  const periodDisplay =
+    dates.length > 0 ? `${dates[0]} s.d. ${dates[dates.length - 1]}` : monthLabel;
+  const lastDateIndo =
+    dates.length > 0 ? formatIndoDate(dates[dates.length - 1]) : semester.reportDate;
+
+  return (
+    <article className="print-landscape bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[297mm] p-8 print:border-0 print:shadow-none print:p-0 print:max-w-none">
+      <div className="text-center mb-4">
+        <h2 className="text-base font-bold uppercase tracking-wide text-black">JURNAL MENGAJAR</h2>
+        <p className="text-xs font-semibold text-black mt-0.5">{school.name}</p>
+        <p className="text-xs text-slate-700 mt-0.5">
+          Tahun Ajaran {academicYear} - Semester {semester.name}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-xs mb-3 text-black">
+        <span>
+          <strong>Pendidik:</strong> {teacherDisplay}
+        </span>
+        <span>
+          <strong>Periode:</strong> {periodDisplay}
+        </span>
+      </div>
+
+      <table className="rapor-table w-full border-collapse border border-black text-[11px] mb-6">
         <thead>
-          <tr className="bg-slate-100">
-            <th className="border border-slate-800 py-2 px-2 text-center w-9">No</th>
-            <th className="border border-slate-800 py-2 px-2 text-left w-24">Tanggal / Jam</th>
-            <th className="border border-slate-800 py-2 px-2 text-left w-28">Mapel & Kelas</th>
-            <th className="border border-slate-800 py-2 px-2 text-left w-32">Guru</th>
-            <th className="border border-slate-800 py-2 px-2 text-left">Materi & Aktivitas</th>
-            <th className="border border-slate-800 py-2 px-2 text-center w-20">Status</th>
+          <tr className="bg-slate-200">
+            <th className="border border-black py-2 px-2 text-center font-bold w-24">Tanggal</th>
+            <th className="border border-black py-2 px-2 text-center font-bold w-14">Kelas</th>
+            <th className="border border-black py-2 px-2 text-center font-bold w-32">
+              Mata Pelajaran
+            </th>
+            <th className="border border-black py-2 px-1.5 text-center font-bold w-14">Jam</th>
+            <th className="border border-black py-2 px-2 text-center font-bold w-36">Materi</th>
+            <th className="border border-black py-2 px-2 text-center font-bold">
+              Tujuan Pembelajaran
+            </th>
+            <th className="border border-black py-2 px-2 text-center font-bold w-24">
+              Kehadiran (H/S/I/TK)
+            </th>
+            <th className="border border-black py-2 px-2 text-center font-bold w-48">Catatan</th>
           </tr>
         </thead>
         <tbody>
           {journals.length === 0 ? (
             <tr>
-              <td colSpan={6} className="border border-slate-800 py-4 text-center text-slate-500">
+              <td colSpan={8} className="border border-black py-4 text-center text-slate-600">
                 Belum ada catatan jurnal mengajar pada filter yang dipilih.
               </td>
             </tr>
           ) : (
             journals.map((j, idx) => (
               <tr key={j.id} className={idx === 0 ? 'first-data-row' : undefined}>
-                <td className="border border-slate-800 py-2 px-2 text-center font-mono tabular-nums align-top">
-                  {idx + 1}
+                <td className="border border-black py-1.5 px-2 text-center align-top">
+                  {formatIndoDate(j.date)}
                 </td>
-                <td className="border border-slate-800 py-2 px-2 font-mono tabular-nums align-top">
-                  <div>{j.date}</div>
-                  <div className="text-[11px] text-slate-600">Jam {j.lessonHour}</div>
+                <td className="border border-black py-1.5 px-2 text-center align-top">
+                  {j.className}
                 </td>
-                <td className="border border-slate-800 py-2 px-2 align-top">
-                  <div className="font-semibold">{j.subjectName}</div>
-                  <div className="text-[11px] text-slate-600">Kelas {j.className}</div>
+                <td className="border border-black py-1.5 px-2 align-top">{j.subjectName}</td>
+                <td className="border border-black py-1.5 px-1.5 text-center tabular-nums align-top">
+                  {j.lessonHour}
                 </td>
-                <td className="border border-slate-800 py-2 px-2 align-top">{j.teacherName}</td>
-                <td className="border border-slate-800 py-2 px-2 align-top">
-                  <p className="font-semibold">{j.material}</p>
-                  <p className="text-[11px] text-slate-700 mt-0.5 text-justify">{j.activities}</p>
+                <td className="border border-black py-1.5 px-2 align-top">{j.material}</td>
+                <td className="border border-black py-1.5 px-2 align-top">
+                  {j.objectiveSummary || j.activities}
                 </td>
-                <td className="border border-slate-800 py-2 px-2 text-center font-medium align-top">
-                  {j.completionStatus}
+                <td className="border border-black py-1.5 px-2 text-center tabular-nums align-top">
+                  {j.attendanceSummary || '0/0/0/0'}
+                </td>
+                <td className="border border-black py-1.5 px-2 align-top">
+                  {j.notes || j.activities || j.completionStatus}
                 </td>
               </tr>
             ))
@@ -1002,22 +1187,22 @@ export function JurnalMengajarPrintSheet({
         </tbody>
       </table>
 
-      <div className="rapor-signature-block grid grid-cols-2 gap-8 pt-4 text-xs">
+      <div className="rapor-signature-block grid grid-cols-2 gap-12 pt-4 text-xs">
         <div className="text-center">
-          <p>Mengetahui,</p>
+          <p className="font-bold">Mengetahui</p>
           <p>Kepala Sekolah</p>
-          <div className="h-16" />
-          <p className="font-semibold underline">{school.principalName}</p>
-          <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
+          <div className="h-20" />
+          <p className="font-bold underline">{school.principalName}</p>
+          <p className="text-[11px]">{school.principalNip || '-'}</p>
         </div>
         <div className="text-center">
           <p>
-            {school.regency}, {semester.reportDate}
+            {school.regency}, {lastDateIndo}
           </p>
-          <p>Wali Kelas / Koordinator Kurikulum</p>
-          <div className="h-16" />
-          <p className="font-semibold underline">{cls?.homeroomTeacherName || 'Koordinator Kurikulum'}</p>
-          <p className="font-mono text-[11px]">NIP {cls?.homeroomTeacherNip || '-'}</p>
+          <p>Wali Kelas</p>
+          <div className="h-20" />
+          <p className="font-bold underline">{cls?.homeroomTeacherName || teacherDisplay}</p>
+          <p className="text-[11px]">{cls?.homeroomTeacherNip || '-'}</p>
         </div>
       </div>
     </article>
@@ -1044,7 +1229,7 @@ export function BukuTamuPrintSheet({
   }>;
 }) {
   return (
-    <article className="bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0">
+    <article className="print-portrait bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0">
       <KopSekolah
         school={school}
         title="BUKU TAMU RESMI SEKOLAH"
@@ -1114,84 +1299,229 @@ export function PresensiGuruPrintSheet({
   school,
   academicYear,
   semester,
-  monthLabel,
-  effectiveWorkDays,
-  rows,
+  resolvedMonth,
+  learningDaysCount,
+  dailyCalendar,
+  dailyMatrixRows,
 }: {
   school: PrintSchoolInfo;
   academicYear: string;
   semester: { name: string; reportDate: string };
-  monthLabel: string;
-  effectiveWorkDays: number;
-  rows: TeacherTppSummaryRow[];
+  resolvedMonth: string;
+  learningDaysCount: number;
+  dailyCalendar: DailyCalendarDay[];
+  dailyMatrixRows: TeacherDailyMatrixRow[];
 }) {
+  const monthTitle = formatMonthTitle(resolvedMonth);
+  const endMonthDate = formatEndOfMonthDate(resolvedMonth) || semester.reportDate;
+
+  const dayBg = (holidayType: DailyCalendarDay['holidayType']) => {
+    if (holidayType === 'national') return 'bg-rose-100';
+    if (holidayType === 'semester') return 'bg-amber-100';
+    if (holidayType === 'weekend') return 'bg-slate-100';
+    return '';
+  };
+
   return (
-    <article className="bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0">
-      <KopSekolah
-        school={school}
-        title="REKAPITULASI PRESENSI KEHADIRAN GURU & PTK"
-        subtitle={`Tahun Ajaran ${academicYear} · ${semester.name} · Periode ${monthLabel} · Hari Efektif: ${effectiveWorkDays} Hari`}
-      />
+    <article className="print-landscape bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[297mm] p-6 print:border-0 print:shadow-none print:p-0 print:max-w-none">
+      <div className="text-center mb-3">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-black">KEADAAN PERSONIL</h2>
+        <p className="text-xs font-semibold text-black">{school.name}</p>
+        <p className="text-[11px] text-slate-700">
+          Tahun Pelajaran {academicYear} - Semester {semester.name}
+        </p>
+        <p className="text-[11px] font-semibold text-black">
+          Bulan {monthTitle} ({learningDaysCount} hari belajar)
+        </p>
+      </div>
 
-      <table className="rapor-table w-full border-collapse border border-slate-800 text-xs my-5">
-        <thead>
-          <tr className="bg-slate-100">
-            <th className="border border-slate-800 py-2 px-1.5 text-center w-8">No</th>
-            <th className="border border-slate-800 py-2 px-2 text-left">Nama Guru / NIP</th>
-            <th className="border border-slate-800 py-2 px-1.5 text-center w-16">Status</th>
-            <th className="border border-slate-800 py-2 px-1.5 text-center w-11">H</th>
-            <th className="border border-slate-800 py-2 px-1.5 text-center w-11">DL</th>
-            <th className="border border-slate-800 py-2 px-1.5 text-center w-11">S</th>
-            <th className="border border-slate-800 py-2 px-1.5 text-center w-11">I</th>
-            <th className="border border-slate-800 py-2 px-1.5 text-center w-11">A</th>
-            <th className="border border-slate-800 py-2 px-2 text-right w-16">Hadir %</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, idx) => (
-            <tr key={r.teacherId} className={idx === 0 ? 'first-data-row' : undefined}>
-              <td className="border border-slate-800 py-1.5 px-1.5 text-center font-mono tabular-nums">
-                {idx + 1}
-              </td>
-              <td className="border border-slate-800 py-1.5 px-2">
-                <div className="font-semibold">{r.fullName}</div>
-                <div className="text-[11px] font-mono text-slate-600">NIP {r.nip}</div>
-              </td>
-              <td className="border border-slate-800 py-1.5 px-1.5 text-center">
-                {r.employmentStatus}
-              </td>
-              <td className="border border-slate-800 py-1.5 px-1.5 text-center font-mono tabular-nums">
-                {r.hadir}
-              </td>
-              <td className="border border-slate-800 py-1.5 px-1.5 text-center font-mono tabular-nums">
-                {r.dinasLuar}
-              </td>
-              <td className="border border-slate-800 py-1.5 px-1.5 text-center font-mono tabular-nums">
-                {r.sakit}
-              </td>
-              <td className="border border-slate-800 py-1.5 px-1.5 text-center font-mono tabular-nums">
-                {r.izin}
-              </td>
-              <td className="border border-slate-800 py-1.5 px-1.5 text-center font-mono tabular-nums">
-                {r.alpa}
-              </td>
-              <td className="border border-slate-800 py-1.5 px-2 text-right font-mono tabular-nums font-bold">
-                {r.attendancePercent.toFixed(1)}%
-              </td>
+      <div className="overflow-x-auto print:overflow-visible">
+        <table className="w-full border-collapse border border-black text-[8.5px] leading-tight">
+          <thead>
+            <tr>
+              <th rowSpan={2} className="border border-black px-1 py-1 text-center font-bold w-6">
+                NO
+              </th>
+              <th rowSpan={2} className="border border-black px-1.5 py-1 text-center font-bold min-w-[96px]">
+                NAMA/NIP
+              </th>
+              <th rowSpan={2} className="border border-black px-0.5 py-1 text-center font-bold w-8">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap py-1 text-[7.5px]">
+                  TEMPAT &amp; TANGGAL LAHIR
+                </div>
+              </th>
+              <th rowSpan={2} className="border border-black px-0.5 py-1 text-center font-bold w-5">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap py-1 text-[7.5px]">
+                  JENIS KELAMIN
+                </div>
+              </th>
+              <th rowSpan={2} className="border border-black px-0.5 py-1 text-center font-bold w-6">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap py-1 text-[7.5px]">
+                  IJAZAH/TAHUN
+                </div>
+              </th>
+              <th rowSpan={2} className="border border-black px-0.5 py-1 text-center font-bold w-7">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap py-1 text-[7.5px]">
+                  JABATAN
+                </div>
+              </th>
+              <th rowSpan={2} className="border border-black px-0.5 py-1 text-center font-bold w-6">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap py-1 text-[7.5px]">
+                  GOL GAJI TMT
+                </div>
+              </th>
+              <th colSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[7.5px]">
+                TANGGAL MULAI
+              </th>
+              <th rowSpan={2} className="border border-black px-0.5 py-1 text-center font-bold w-7">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap py-1 text-[7.5px]">
+                  STATUS KEPEGAWAIAN
+                </div>
+              </th>
+              <th colSpan={2} className="border border-black px-1 py-1 text-center font-bold text-[7.5px]">
+                TGL KENAIKAN
+              </th>
+              <th
+                colSpan={dailyCalendar.length || 30}
+                className="border border-black px-1 py-1 text-center font-bold text-[8px]"
+              >
+                TANGGAL DAFTAR HADIR
+              </th>
+              <th colSpan={6} className="border border-black px-1 py-1 text-center font-bold text-[8px]">
+                JUMLAH
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+            <tr>
+              <th className="border border-black px-0.5 py-1 text-center font-bold w-5">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap text-[7px]">
+                  DIANGKAT
+                </div>
+              </th>
+              <th className="border border-black px-0.5 py-1 text-center font-bold w-5">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap text-[7px]">
+                  KERJA DI SEKOLAH INI
+                </div>
+              </th>
+              <th className="border border-black px-0.5 py-1 text-center font-bold w-5">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap text-[7px]">
+                  GAJI BERKALA
+                </div>
+              </th>
+              <th className="border border-black px-0.5 py-1 text-center font-bold w-5">
+                <div className="[writing-mode:vertical-rl] rotate-180 mx-auto whitespace-nowrap text-[7px]">
+                  PANGKAT
+                </div>
+              </th>
+              {dailyCalendar.map((d) => (
+                <th
+                  key={d.day}
+                  className={`border border-black px-0.5 py-1 text-center font-bold w-4 tabular-nums text-[7.5px] ${dayBg(
+                    d.holidayType
+                  )}`}
+                >
+                  {d.day}
+                </th>
+              ))}
+              {['H', 'I', 'S', 'DL', 'CT', 'TK'].map((lbl) => (
+                <th
+                  key={lbl}
+                  className="border border-black px-0.5 py-1 text-center font-bold w-4 text-[7.5px]"
+                >
+                  {lbl}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {dailyMatrixRows.map((r, idx) => (
+              <tr key={r.teacherId}>
+                <td className="border border-black px-1 py-1 text-center tabular-nums">
+                  {idx + 1}
+                </td>
+                <td className="border border-black px-1.5 py-1">
+                  <div className="font-semibold">{r.fullName}</div>
+                  <div className="text-[7.5px] text-slate-700">{r.nip}</div>
+                </td>
+                <td className="border border-black px-0.5 py-1 text-center">—</td>
+                <td className="border border-black px-0.5 py-1 text-center">{r.gender}</td>
+                <td className="border border-black px-0.5 py-1 text-center">—</td>
+                <td className="border border-black px-0.5 py-1 text-center">Guru</td>
+                <td className="border border-black px-0.5 py-1 text-center">—</td>
+                <td className="border border-black px-0.5 py-1 text-center">—</td>
+                <td className="border border-black px-0.5 py-1 text-center">—</td>
+                <td className="border border-black px-0.5 py-1 text-center">
+                  {r.employmentStatus}
+                </td>
+                <td className="border border-black px-0.5 py-1 text-center">—</td>
+                <td className="border border-black px-0.5 py-1 text-center">—</td>
+                {dailyCalendar.map((d) => (
+                  <td
+                    key={d.day}
+                    className={`border border-black px-0.5 py-1 text-center font-bold ${dayBg(
+                      d.holidayType
+                    )}`}
+                  >
+                    {r.dailyStatuses[d.day] || ''}
+                  </td>
+                ))}
+                <td className="border border-black px-0.5 py-1 text-center tabular-nums">
+                  {r.counts.hadir || ''}
+                </td>
+                <td className="border border-black px-0.5 py-1 text-center tabular-nums">
+                  {r.counts.izin || ''}
+                </td>
+                <td className="border border-black px-0.5 py-1 text-center tabular-nums">
+                  {r.counts.sakit || ''}
+                </td>
+                <td className="border border-black px-0.5 py-1 text-center tabular-nums">
+                  {r.counts.dinasLuar || ''}
+                </td>
+                <td className="border border-black px-0.5 py-1 text-center tabular-nums">
+                  {r.counts.cuti || ''}
+                </td>
+                <td className="border border-black px-0.5 py-1 text-center tabular-nums">
+                  {r.counts.alpa || ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <div className="rapor-signature-block flex justify-end pt-4 text-xs">
-        <div className="text-center min-w-[220px]">
-          <p>
-            {school.regency}, {semester.reportDate}
-          </p>
-          <p>Kepala Sekolah</p>
+      {/* Legend Bar */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-4 text-[10px] text-black">
+        <div className="flex items-center gap-4">
+          <span>
+            <strong>Guru</strong> : Guru
+          </span>
+          <span>
+            <strong>Ct</strong> : Cuti
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 border border-black bg-slate-100" />
+            Libur akhir pekan
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 border border-black bg-rose-100" />
+            Libur nasional
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block w-2.5 h-2.5 border border-black bg-amber-100" />
+            Libur semester
+          </span>
+        </div>
+      </div>
+
+      <div className="rapor-signature-block flex justify-end pt-5 text-xs">
+        <div className="text-left min-w-[200px]">
+          <p>{endMonthDate}</p>
+          <p>Kepala</p>
+          <p>{school.name}</p>
           <div className="h-16" />
-          <p className="font-semibold underline">{school.principalName}</p>
-          <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
+          <p className="font-bold">{school.principalName}</p>
+          <p className="text-[11px]">NIP. {school.principalNip || '-'}</p>
         </div>
       </div>
     </article>

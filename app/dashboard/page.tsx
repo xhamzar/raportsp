@@ -137,7 +137,7 @@ export default function DashboardPage() {
                 </Link>
               )}
               {can('rapor', 'read') && (
-                <Link href="/rapor">
+                <Link href="/cetak?doc=rapor">
                   <Button size="sm">
                     <Printer className="w-4 h-4" />
                     Cetak Rapor {data.selectedClass?.name}
@@ -291,17 +291,14 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">
                   Statistik Kehadiran Semester Berjalan
                 </h2>
-                <div className="grid grid-cols-4 gap-2 text-center">
+                <div className="grid grid-cols-4 divide-x divide-slate-200 dark:divide-slate-800 border-y border-slate-100 dark:border-slate-800 py-3 text-center">
                   {[
                     { label: 'Hadir', val: data.stats.studentAttendance.H, color: 'text-emerald-700 dark:text-emerald-400' },
                     { label: 'Sakit', val: data.stats.studentAttendance.S, color: 'text-amber-700 dark:text-amber-400' },
                     { label: 'Izin', val: data.stats.studentAttendance.I, color: 'text-blue-700 dark:text-blue-400' },
                     { label: 'Alpa', val: data.stats.studentAttendance.A, color: 'text-red-700 dark:text-red-400' },
                   ].map((s) => (
-                    <div
-                      key={s.label}
-                      className="py-2.5 px-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-md"
-                    >
+                    <div key={s.label} className="px-2">
                       <p className={`text-lg font-bold font-mono tabular-nums ${s.color}`}>
                         {s.val}
                       </p>

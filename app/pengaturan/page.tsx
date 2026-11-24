@@ -25,6 +25,7 @@ import {
   Input,
   Modal,
   Select,
+  TabBar,
   TableSkeleton,
 } from '@/components/ui/Primitives';
 import {
@@ -815,14 +816,14 @@ export default function PengaturanPage() {
   };
 
   const tabs: Array<{ id: SettingsTab; label: string }> = [
-    { id: 'akun', label: 'Profil & Kata Sandi' },
+    { id: 'akun', label: 'Akun Saya' },
     ...(canReadUsers
       ? [
-          { id: 'pengguna' as const, label: 'Pengguna & Cakupan' },
-          { id: 'peran' as const, label: 'Peran & Matriks Izin' },
+          { id: 'pengguna' as const, label: 'Pengguna' },
+          { id: 'peran' as const, label: 'Peran & Izin' },
         ]
       : []),
-    ...(canReadBackup ? [{ id: 'backup' as const, label: 'Cadangan SQLite' }] : []),
+    ...(canReadBackup ? [{ id: 'backup' as const, label: 'Cadangan' }] : []),
   ];
 
   const userScopeLabel = user?.hasFullScope
@@ -830,33 +831,22 @@ export default function PengaturanPage() {
     : SCOPE_MODE_LABELS[user?.scopeMode || 'ASSIGNED'].label;
 
   return (
-    <AppShell title="Pengaturan & Hak Akses">
+    <AppShell title="Pengaturan">
       <div className="space-y-5">
         <div>
           <h1 className="font-[family-name:var(--font-display)] text-lg font-bold text-slate-900 dark:text-slate-100">
-            Pengaturan Sistem, Matriks RBAC & Cadangan Database
+            Pengaturan Akun & Sistem
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Kelola keamanan akun, peran kustom, matriks izin 17 modul, cakupan kelas/mapel, log audit, dan cadangan SQLite.
+            Kelola profil akun, pengguna, peran dan hak akses, serta cadangan database lokal.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-200/70 dark:bg-slate-800/80 rounded-md w-fit">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`px-3.5 py-1.5 text-xs font-medium rounded cursor-pointer ${
-                activeTab === t.id
-                  ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          items={tabs}
+          activeId={activeTab}
+          onChange={(id) => setTab(id as SettingsTab)}
+        />
 
         {activeTab === 'akun' ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">

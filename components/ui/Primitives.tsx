@@ -322,3 +322,51 @@ export function AccessDeniedCard({
     </div>
   );
 }
+
+export interface TabBarItem {
+  id: string;
+  label: string;
+}
+
+export function TabBar({
+  items,
+  activeId,
+  onChange,
+  className,
+}: {
+  items: TabBarItem[];
+  activeId: string;
+  onChange: (id: string) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      className={cn(
+        'inline-flex max-w-full overflow-x-auto items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-800 rounded-md',
+        className
+      )}
+    >
+      {items.map((item) => {
+        const active = item.id === activeId;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(item.id)}
+            className={cn(
+              'px-3 py-1.5 text-xs font-medium rounded transition-colors duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]',
+              active
+                ? 'bg-white dark:bg-[#111C2E] text-[#0F2942] dark:text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+            )}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
