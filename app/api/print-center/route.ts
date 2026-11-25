@@ -188,7 +188,9 @@ export async function GET(req: NextRequest) {
         parentPhone: students.parentPhone,
         guardianName: students.guardianName,
         guardianRelation: students.guardianRelation,
+        guardianJob: students.guardianJob,
         guardianPhone: students.guardianPhone,
+        guardianAddress: students.guardianAddress,
       })
       .from(classStudents)
       .innerJoin(students, eq(classStudents.studentId, students.id))

@@ -110,7 +110,9 @@ export interface PrintStudentBiodata {
   parentPhone?: string | null;
   guardianName?: string | null;
   guardianRelation?: string | null;
+  guardianJob?: string | null;
   guardianPhone?: string | null;
+  guardianAddress?: string | null;
 }
 
 export interface SubjectGradeItem {
@@ -395,85 +397,170 @@ export function CoverRaporSheet({
 export function BiodataMuridSheet({
   school,
   semester,
-  cls,
   student,
   pageBreak,
 }: {
   school: PrintSchoolInfo;
   semester: { name: string; reportDate: string };
-  cls: PrintClassInfo;
+  cls?: PrintClassInfo;
   student: PrintStudentBiodata;
   pageBreak?: boolean;
 }) {
+  const dash = '—';
+  const orDash = (v: string | null | undefined) => (v && v.trim() ? v.trim() : dash);
+
   const addressParts = [
-    student.address,
-    student.rtRw ? `RT/RW ${student.rtRw}` : '',
-    student.village ? `Kel. ${student.village}` : '',
-    student.district ? `Kec. ${student.district}` : '',
-    student.regency,
-    student.province,
-    student.postalCode,
+    student.address?.trim() || '',
+    student.village?.trim() || '',
+    student.district?.trim() || '',
+    student.regency?.trim() || '',
+    student.province?.trim() || '',
   ].filter(Boolean);
-  const formattedAddress = addressParts.length > 0 ? addressParts.join(', ') : '-';
+  const formattedAddress = addressParts.length > 0 ? addressParts.join(', ') : dash;
 
-  const guardianDisplay = student.guardianName
-    ? student.guardianRelation
-      ? `${student.guardianName} (${student.guardianRelation})`
-      : student.guardianName
-    : '-';
+  const birthDateText = student.birthDate ? formatIndoDate(student.birthDate) : dash;
+  const birthPlaceText = orDash(student.birthPlace);
+  const ttlText =
+    birthPlaceText === dash && birthDateText === dash
+      ? dash
+      : `${birthPlaceText} / ${birthDateText}`;
 
-  const rows: Array<[string, string, string]> = [
-    ['1.', 'Nama Lengkap Peserta Didik', student.fullName.toUpperCase()],
-    ['2.', 'NIS / NISN', `${student.nis} / ${student.nisn}`],
-    ['3.', 'Tempat, Tanggal Lahir', `${student.birthPlace}, ${formatIndoDate(student.birthDate)}`],
-    ['4.', 'Jenis Kelamin', student.gender === 'L' ? 'Laki-laki' : 'Perempuan'],
-    ['5.', 'Agama', student.religion],
-    ['6.', 'Kelas / Fase Saat Ini', `${cls.name} (Fase ${cls.fase})`],
-    ['7.', 'Sekolah Asal / Sebelumnya', student.previousSchool || '-'],
-    ['8.', 'Tanggal Diterima di Sekolah Ini', formatIndoDate(student.enrollmentDate)],
-    ['9.', 'Alamat Peserta Didik', formattedAddress],
-    ['10.', 'Nomor Telepon / HP', student.phone || student.parentPhone || '-'],
-    ['11.', 'Nama Ayah Kandung', student.fatherName || '-'],
-    ['12.', 'Pekerjaan Ayah', student.fatherJob || '-'],
-    ['13.', 'Nama Ibu Kandung', student.motherName || '-'],
-    ['14.', 'Pekerjaan Ibu', student.motherJob || '-'],
-    ['15.', 'Telepon Orang Tua', student.parentPhone || '-'],
-    ['16.', 'Nama Wali Peserta Didik', guardianDisplay],
+  const guardianNameDisplay = student.guardianName?.trim()
+    ? student.guardianRelation?.trim()
+      ? `${student.guardianName.trim()} (${student.guardianRelation.trim()})`
+      : student.guardianName.trim()
+    : dash;
+
+  const biodataRows: Array<{
+    key: string;
+    no: string;
+    label: string;
+    value: string;
+    isSub?: boolean;
+    isGroupHeader?: boolean;
+  }> = [
+    { key: '1', no: '1.', label: 'Nama Murid', value: student.fullName.toUpperCase() },
+    { key: '2', no: '2.', label: 'NIS / NISN', value: `${orDash(student.nis)} / ${orDash(student.nisn)}` },
+    { key: '3', no: '3.', label: 'Tempat / Tanggal Lahir', value: ttlText },
+    {
+      key: '4',
+      no: '4.',
+      label: 'Jenis Kelamin',
+      value: student.gender === 'L' ? 'Laki-laki' : 'Perempuan',
+    },
+    { key: '5', no: '5.', label: 'Agama', value: orDash(student.religion) },
+    {
+      key: '6',
+      no: '6.',
+      label: 'Pendidikan Sebelumnya',
+      value: orDash(student.previousSchool),
+    },
+    { key: '7', no: '7.', label: 'Alamat Murid', value: formattedAddress },
+    { key: '8', no: '8.', label: 'Nama Orang Tua', value: '', isGroupHeader: true },
+    { key: '8a', no: '', label: 'a.  Ayah', value: orDash(student.fatherName), isSub: true },
+    { key: '8b', no: '', label: 'b.  Ibu', value: orDash(student.motherName), isSub: true },
+    { key: '9', no: '9.', label: 'Pekerjaan Orang Tua', value: '', isGroupHeader: true },
+    { key: '9a', no: '', label: 'a.  Ayah', value: orDash(student.fatherJob), isSub: true },
+    { key: '9b', no: '', label: 'b.  Ibu', value: orDash(student.motherJob), isSub: true },
+    { key: '10', no: '10.', label: 'Alamat Orang Tua', value: '', isGroupHeader: true },
+    { key: '10a', no: '', label: 'a.  Jalan', value: orDash(student.address), isSub: true },
+    {
+      key: '10b',
+      no: '',
+      label: 'b.  Kelurahan/Desa',
+      value: orDash(student.village),
+      isSub: true,
+    },
+    {
+      key: '10c',
+      no: '',
+      label: 'c.  Kecamatan',
+      value: orDash(student.district),
+      isSub: true,
+    },
+    {
+      key: '10d',
+      no: '',
+      label: 'd.  Kabupaten/Kota',
+      value: orDash(student.regency),
+      isSub: true,
+    },
+    {
+      key: '10e',
+      no: '',
+      label: 'e.  Provinsi',
+      value: orDash(student.province),
+      isSub: true,
+    },
+    { key: '11', no: '11.', label: 'Wali Murid', value: '', isGroupHeader: true },
+    { key: '11a', no: '', label: 'a.  Nama Wali', value: guardianNameDisplay, isSub: true },
+    {
+      key: '11b',
+      no: '',
+      label: 'b.  Pekerjaan Wali',
+      value: orDash(student.guardianJob),
+      isSub: true,
+    },
+    {
+      key: '11c',
+      no: '',
+      label: 'c.  Alamat Wali',
+      value: orDash(student.guardianAddress),
+      isSub: true,
+    },
   ];
+
+  const showKop = school.showLetterhead !== false;
 
   return (
     <article
-      className={`bg-white text-slate-900 border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0 ${
+      className={`print-portrait bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[210mm] px-10 py-10 sm:px-14 sm:py-12 print:border-0 print:shadow-none print:px-8 print:py-6 ${
         pageBreak ? 'rapor-page-break' : ''
       }`}
     >
-      <KopSekolah
-        school={school}
-        title="IDENTITAS PESERTA DIDIK (BIODATA)"
-        subtitle={`Semester ${semester.name}`}
-      />
+      {showKop ? (
+        <>
+          <KopSekolah school={school} title="DOKUMEN RESMI SEKOLAH" />
+          <div className="text-center mt-5 mb-6">
+            <h3 className="text-lg font-bold uppercase tracking-wide text-black">
+              IDENTITAS MURID
+            </h3>
+          </div>
+        </>
+      ) : (
+        <div className="text-center pt-1 mb-7 space-y-1">
+          <h2 className="text-[20px] font-bold uppercase tracking-wide text-black leading-tight">
+            IDENTITAS MURID
+          </h2>
+          <p className="text-xs font-medium uppercase tracking-wide text-black">
+            {school.name}
+          </p>
+        </div>
+      )}
 
-      <h3 className="text-center text-sm font-bold uppercase tracking-wide text-slate-900 my-5">
-        KETERANGAN TENTANG DIRI PESERTA DIDIK
-      </h3>
-
-      <table className="w-full text-xs border-collapse mb-8">
+      <table className="w-full text-[12px] leading-[1.45] border-collapse mb-8 text-black">
         <tbody>
-          {rows.map(([no, label, value]) => (
-            <tr key={no} className="border-b border-slate-200">
-              <td className="py-2 pr-2 w-8 font-mono tabular-nums align-top text-slate-600">
-                {no}
+          {biodataRows.map((row) => (
+            <tr key={row.key}>
+              <td className="py-[3px] pr-2 w-8 align-top text-black">{row.no}</td>
+              <td
+                className={`py-[3px] pr-3 w-[210px] align-top text-black ${
+                  row.isSub ? 'pl-5' : ''
+                }`}
+              >
+                {row.label}
               </td>
-              <td className="py-2 pr-3 w-56 align-top text-slate-700">{label}</td>
-              <td className="py-2 pr-2 w-4 align-top">:</td>
-              <td className="py-2 font-medium text-slate-900 align-top">{value}</td>
+              <td className="py-[3px] pr-3 w-4 align-top text-black">:</td>
+              <td className="py-[3px] align-top font-bold text-black">
+                {row.isGroupHeader ? '' : row.value}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <div className="rapor-signature-block flex items-end justify-between gap-8 pt-4 text-xs">
-        <div className="w-[3cm] h-[4cm] border border-slate-800 flex flex-col items-center justify-center text-center text-[11px] text-slate-500 overflow-hidden bg-slate-50">
+      <div className="rapor-signature-block flex items-start justify-end gap-12 pt-4 pr-2 text-xs text-black">
+        <div className="w-[3cm] h-[4cm] border-[1.5px] border-black flex items-center justify-center text-center text-[11px] text-black overflow-hidden bg-white shrink-0">
           {student.photoUrl ? (
             <img
               src={student.photoUrl}
@@ -482,21 +569,20 @@ export function BiodataMuridSheet({
               className="w-full h-full object-cover"
             />
           ) : (
-            <>
-              <span>Pas Foto</span>
-              <span>3 × 4 cm</span>
-            </>
+            <span>PAS FOTO 3x4</span>
           )}
         </div>
 
-        <div className="text-center min-w-[220px]">
+        <div className="text-center min-w-[220px] pt-1">
           <p>
             {school.regency}, {formatIndoDate(semester.reportDate)}
           </p>
-          <p>Kepala Sekolah,</p>
+          <p>Kepala Sekolah</p>
           <PrincipalSignatureArea school={school} heightClass="h-16" />
-          <p className="font-semibold underline">{school.principalName}</p>
-          <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
+          <p className="font-bold text-black">{school.principalName}</p>
+          <p className="text-[11px] text-black">
+            {school.principalNip ? `NIP ${school.principalNip}` : '-'}
+          </p>
         </div>
       </div>
     </article>
