@@ -16,6 +16,7 @@ import {
   TabBar,
   TableSkeleton,
 } from '@/components/ui/Primitives';
+import { formatIndoDate } from '@/lib/utils';
 
 interface SubjectRow {
   id: number;
@@ -454,38 +455,44 @@ function KurikulumInner() {
         ) : tab === 'mapel' ? (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold w-10">No</th>
-                    <th className="py-3 px-3 font-semibold">Kode</th>
-                    <th className="py-3 px-3 font-semibold">Mata Pelajaran</th>
-                    <th className="py-3 px-3 font-semibold">Kategori</th>
-                    <th className="py-3 px-3 font-semibold">Guru Pengampu</th>
-                    <th className="py-3 px-3 font-semibold text-right">KKTP</th>
-                    <th className="py-3 px-3 font-semibold text-right">JP / Minggu</th>
-                    <th className="py-3 px-3 font-semibold text-right">Aksi</th>
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-3 px-3 font-semibold w-10 col-id">No</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">Kode</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">Mata Pelajaran</th>
+                    <th className="py-3 px-3 font-semibold col-a col-sep">Kategori</th>
+                    <th className="py-3 px-3 font-semibold col-a col-cell-div">Guru Pengampu</th>
+                    <th className="py-3 px-3 font-semibold text-right col-total col-sep">KKTP</th>
+                    <th className="py-3 px-3 font-semibold text-right col-total col-cell-div">
+                      JP / Minggu
+                    </th>
+                    <th className="py-3 px-3 font-semibold text-right col-action col-sep">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {subjects.map((sub, idx) => (
-                    <tr key={sub.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-600 dark:text-slate-300">
+                    <tr key={sub.id}>
+                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500 col-id">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-600 dark:text-slate-300 col-id col-cell-div">
                         {sub.code}
                       </td>
-                      <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100">
+                      <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100 col-id col-cell-div">
                         {sub.name}
                       </td>
-                      <td className="py-2.5 px-3">{sub.category}</td>
-                      <td className="py-2.5 px-3">{sub.teacherName || 'Guru Kelas'}</td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold">
+                      <td className="py-2.5 px-3 col-a col-sep">{sub.category}</td>
+                      <td className="py-2.5 px-3 col-a col-cell-div">
+                        {sub.teacherName || 'Guru Kelas'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold col-total col-sep">
                         {sub.kkm}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums col-total col-cell-div">
                         {sub.weeklyHours} JP
                       </td>
-                      <td className="py-2.5 px-3 text-right">
+                      <td className="py-2.5 px-3 text-right col-action col-sep">
                         <div className="inline-flex items-center gap-1">
                           {can('kurikulum', 'update') && (
                             <button
@@ -565,36 +572,42 @@ function KurikulumInner() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                      <tr>
-                        <th className="py-3 px-3 font-semibold w-14">Urut</th>
-                        <th className="py-3 px-3 font-semibold w-28">Kode TP</th>
-                        <th className="py-3 px-3 font-semibold">Lingkup Materi</th>
-                        <th className="py-3 px-3 font-semibold">Rumusan Tujuan Pembelajaran</th>
-                        <th className="py-3 px-3 font-semibold text-right">KKTP</th>
-                        <th className="py-3 px-3 font-semibold text-right">Aksi</th>
+                  <table className="data-table text-left text-xs">
+                    <thead>
+                      <tr className="text-slate-600 dark:text-slate-300">
+                        <th className="py-3 px-3 font-semibold w-14 col-id">Urut</th>
+                        <th className="py-3 px-3 font-semibold w-28 col-id col-cell-div">Kode TP</th>
+                        <th className="py-3 px-3 font-semibold col-a col-sep">Lingkup Materi</th>
+                        <th className="py-3 px-3 font-semibold col-b col-sep">
+                          Rumusan Tujuan Pembelajaran
+                        </th>
+                        <th className="py-3 px-3 font-semibold text-right col-total col-sep">
+                          KKTP
+                        </th>
+                        <th className="py-3 px-3 font-semibold text-right col-action col-sep">
+                          Aksi
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody>
                       {activeTps.map((tp) => (
                         <tr key={tp.id}>
-                          <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">
+                          <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500 col-id">
                             #{tp.atpOrder}
                           </td>
-                          <td className="py-2.5 px-3 font-mono tabular-nums font-medium">
+                          <td className="py-2.5 px-3 font-mono tabular-nums font-medium col-id col-cell-div">
                             {tp.code}
                           </td>
-                          <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100">
+                          <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100 col-a col-sep">
                             {tp.scopeMaterial}
                           </td>
-                          <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 leading-relaxed">
+                          <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 leading-relaxed col-b col-sep">
                             {tp.description}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold">
+                          <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold col-total col-sep">
                             {tp.kktpThreshold}
                           </td>
-                          <td className="py-2.5 px-3 text-right">
+                          <td className="py-2.5 px-3 text-right col-action col-sep">
                             {can('kurikulum', 'delete') && (
                               <button
                                 type="button"
@@ -768,8 +781,8 @@ function KurikulumInner() {
                           <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
                             {r.scopeMaterial || 'Topik Pembelajaran'}
                           </span>
-                          <span className="text-[11px] font-mono tabular-nums text-slate-500">
-                            {r.createdAt.slice(0, 10)}
+                          <span className="text-[11px] tabular-nums whitespace-nowrap text-slate-500">
+                            {formatIndoDate(r.createdAt)}
                           </span>
                         </div>
                         <p className="text-xs text-slate-600 dark:text-slate-300">

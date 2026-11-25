@@ -42,6 +42,11 @@ export interface SchoolInfo {
   principalName: string;
   principalNip: string;
   logoUrl: string;
+  principalSignaturePath?: string | null;
+  schoolStampPath?: string | null;
+  showPrincipalSignature?: boolean;
+  showSchoolStamp?: boolean;
+  showLetterhead?: boolean;
   enableKeasramaan: boolean;
   enableAi: boolean;
 }

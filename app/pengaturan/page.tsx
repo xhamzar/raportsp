@@ -2,10 +2,12 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Building2,
   Copy,
   DatabaseBackup,
   Download,
   Edit3,
+  FileSignature,
   KeyRound,
   Lock,
   Plus,
@@ -13,7 +15,9 @@ import {
   Save,
   ShieldCheck,
   SlidersHorizontal,
+  Stamp,
   Trash2,
+  Upload,
   Users,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
@@ -27,6 +31,7 @@ import {
   Select,
   TabBar,
   TableSkeleton,
+  ToggleSwitch,
 } from '@/components/ui/Primitives';
 import {
   ACTION_LABELS,
@@ -39,6 +44,7 @@ import {
   type ModuleName,
   type ScopeMode,
 } from '@/lib/auth/rbac-constants';
+import { formatIndoDateTime } from '@/lib/utils';
 
 interface UserRow {
   id: number;
@@ -97,13 +103,15 @@ interface BackupRow {
   createdAt: string;
 }
 
-type SettingsTab = 'akun' | 'pengguna' | 'peran' | 'backup';
+type SettingsTab = 'akun' | 'dokumen' | 'pengguna' | 'peran' | 'backup';
 
 export default function PengaturanPage() {
-  const { user, classes: contextClasses, can, notify, refreshContext } = useApp();
+  const { user, school, classes: contextClasses, can, notify, refreshContext } = useApp();
   const [tab, setTab] = useState<SettingsTab>('akun');
   const [loading, setLoading] = useState(false);
 
+  const canReadSchool = can('sekolah', 'read');
+  const canUpdateSchool = can('sekolah', 'update');
   const canReadUsers = can('pengguna', 'read');
   const canCreateUsers = can('pengguna', 'create');
   const canUpdateUsers = can('pengguna', 'update');
@@ -112,6 +120,12 @@ export default function PengaturanPage() {
   const canCreateBackup = can('backup', 'create');
   const canExportBackup = can('backup', 'export');
   const canApproveBackup = can('backup', 'approve');
+
+  // Signature & Stamp state
+  const sigInputRef = useRef<HTMLInputElement | null>(null);
+  const stampInputRef = useRef<HTMLInputElement | null>(null);
+  const [assetBusy, setAssetBusy] = useState<'signature' | 'stamp' | 'toggle' | null>(null);
+  const [assetVersion, setAssetVersion] = useState<number>(() => Date.now());
 
   // Password Change
   const [pwdForm, setPwdForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -175,12 +189,22 @@ export default function PengaturanPage() {
   const [backupNotes, setBackupNotes] = useState('');
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
 
+  // Sync initial tab from ?tab= query param
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t === 'dokumen' || t === 'pengguna' || t === 'peran' || t === 'backup' || t === 'akun') {
+      Promise.resolve().then(() => setTab(t));
+    }
+  }, []);
+
   // Ensure active tab stays valid when switching roles or losing permissions
   const activeTab: SettingsTab = useMemo(() => {
+    if (tab === 'dokumen' && !canReadSchool && !canUpdateSchool) return 'akun';
     if ((tab === 'pengguna' || tab === 'peran') && !canReadUsers) return 'akun';
     if (tab === 'backup' && !canReadBackup) return 'akun';
     return tab;
-  }, [tab, canReadUsers, canReadBackup]);
+  }, [tab, canReadSchool, canUpdateSchool, canReadUsers, canReadBackup]);
 
   const applyRoleDraft = useCallback((role: RoleDetailRow | null | undefined) => {
     if (!role) return;
@@ -815,8 +839,98 @@ export default function PengaturanPage() {
     );
   };
 
+  const handleUploadSchoolAsset = async (type: 'signature' | 'stamp', file: File | null) => {
+    if (!file) return;
+    setAssetBusy(type);
+    try {
+      const formData = new FormData();
+      formData.append('type', type);
+      formData.append('file', file);
+      const res = await fetch('/api/school/assets', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify('error', json.error || 'Gagal mengunggah gambar.');
+        return;
+      }
+      setAssetVersion(Date.now());
+      await refreshContext();
+      notify(
+        'success',
+        type === 'signature'
+          ? 'Tanda tangan Kepala Sekolah berhasil diperbarui.'
+          : 'Stempel sekolah berhasil diperbarui.'
+      );
+    } finally {
+      setAssetBusy(null);
+    }
+  };
+
+  const handleDeleteSchoolAsset = async (type: 'signature' | 'stamp') => {
+    setAssetBusy(type);
+    try {
+      const res = await fetch(`/api/school/assets?type=${type}`, {
+        method: 'DELETE',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify('error', json.error || 'Gagal menghapus gambar.');
+        return;
+      }
+      setAssetVersion(Date.now());
+      await refreshContext();
+      notify(
+        'info',
+        type === 'signature'
+          ? 'Tanda tangan Kepala Sekolah dihapus.'
+          : 'Stempel sekolah dihapus.'
+      );
+    } finally {
+      setAssetBusy(null);
+    }
+  };
+
+  const handleToggleSchoolAsset = async (
+    field: 'showPrincipalSignature' | 'showSchoolStamp' | 'showLetterhead',
+    value: boolean
+  ) => {
+    setAssetBusy('toggle');
+    try {
+      const res = await fetch('/api/school/assets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify('error', json.error || 'Gagal menyimpan status tampilan.');
+        return;
+      }
+      await refreshContext();
+      const label =
+        field === 'showPrincipalSignature'
+          ? 'Tanda tangan'
+          : field === 'showSchoolStamp'
+          ? 'Stempel sekolah'
+          : 'Kop surat sekolah';
+      notify(
+        'success',
+        `${label} ${value ? 'diaktifkan' : 'dinonaktifkan'} pada dokumen cetak.`
+      );
+    } finally {
+      setAssetBusy(null);
+    }
+  };
+
   const tabs: Array<{ id: SettingsTab; label: string }> = [
     { id: 'akun', label: 'Akun Saya' },
+    ...(canReadSchool || canUpdateSchool
+      ? [{ id: 'dokumen' as const, label: 'Dokumen & TTD' }]
+      : []),
     ...(canReadUsers
       ? [
           { id: 'pengguna' as const, label: 'Pengguna' },
@@ -931,6 +1045,259 @@ export default function PengaturanPage() {
               </div>
             </form>
           </div>
+        ) : activeTab === 'dokumen' ? (
+          <div className="space-y-5">
+            {/* Kop Surat Sekolah */}
+            <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-[#0F2942] dark:text-blue-400" />
+                    Kop Surat Sekolah
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-3xl leading-relaxed">
+                    Ditampilkan otomatis pada dokumen cetak resmi ber-kop (Biodata, Piagam, Buku Tamu, dan Laporan TPP). Matikan saklar ini bila Anda mencetak di atas kertas kop surat fisik sekolah.
+                  </p>
+                </div>
+                <ToggleSwitch
+                  checked={school?.showLetterhead ?? true}
+                  disabled={!canUpdateSchool || assetBusy === 'toggle'}
+                  onChange={(next) => handleToggleSchoolAsset('showLetterhead', next)}
+                  label={school?.showLetterhead ?? true ? 'On' : 'Off'}
+                />
+              </div>
+
+              <div className="bg-white text-slate-900 border border-slate-200 rounded-md p-4">
+                {(school?.showLetterhead ?? true) ? (
+                  <div className="flex items-center gap-4 pb-3 border-b-2 border-slate-900">
+                    <img
+                      src="/api/school/logo"
+                      alt="Logo Sekolah"
+                      referrerPolicy="no-referrer"
+                      className="w-14 h-14 object-cover rounded shrink-0"
+                    />
+                    <div className="flex-1 text-center">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                        DOKUMEN RESMI SEKOLAH
+                      </p>
+                      <h3 className="text-sm font-bold uppercase text-slate-900">
+                        {school?.name || 'Nama Sekolah'}
+                      </h3>
+                      <p className="text-[11px] text-slate-700">
+                        {school?.address}, Kec. {school?.district}, {school?.regency},{' '}
+                        {school?.province} · NPSN {school?.npsn}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 text-center py-3">
+                    Kop surat dinonaktifkan — bagian kop surat disembunyikan pada dokumen cetak ber-kop.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
+                    Tanda Tangan & Stempel
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-3xl leading-relaxed">
+                    Unggah tanda tangan kepala sekolah dan stempel sekolah berformat PNG (background transparan disarankan). Keduanya otomatis diterapkan pada dokumen cetak seperti rapor, biodata, piagam, rapor keasramaan, jurnal mengajar, buku tamu, presensi guru, dan laporan TPP. Bila tidak diunggah atau saklar dimatikan, dokumen tetap dicetak tanpa gambar ini.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Tanda Tangan Kepala Sekolah */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 space-y-3 bg-slate-50/50 dark:bg-slate-900/30">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <FileSignature className="w-4 h-4 text-[#0F2942] dark:text-blue-400" />
+                        Tanda Tangan Kepala Sekolah
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Ditempatkan tepat di atas nama kepala sekolah pada dokumen cetak.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      size="sm"
+                      checked={school?.showPrincipalSignature ?? true}
+                      disabled={!canUpdateSchool || assetBusy === 'toggle'}
+                      onChange={(next) => handleToggleSchoolAsset('showPrincipalSignature', next)}
+                      label={school?.showPrincipalSignature ?? true ? 'On' : 'Off'}
+                    />
+                  </div>
+
+                  <div className="h-32 rounded-md border border-slate-200 dark:border-slate-700 bg-white flex flex-col items-center justify-center p-3 overflow-hidden">
+                    {school?.principalSignaturePath ? (
+                      <img
+                        src={`/api/school/assets?type=signature&v=${assetVersion}`}
+                        alt="Tanda Tangan Kepala Sekolah"
+                        referrerPolicy="no-referrer"
+                        className={`max-h-24 max-w-full object-contain transition-opacity ${
+                          school.showPrincipalSignature === false ? 'opacity-35' : 'opacity-100'
+                        }`}
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-400 text-center">
+                        Belum ada gambar tanda tangan diunggah
+                      </span>
+                    )}
+                  </div>
+
+                  {canUpdateSchool && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={sigInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          e.target.value = '';
+                          void handleUploadSchoolAsset('signature', file);
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={assetBusy === 'signature'}
+                        onClick={() => sigInputRef.current?.click()}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        {school?.principalSignaturePath ? 'Ganti' : 'Unggah PNG'}
+                      </Button>
+                      {school?.principalSignaturePath && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={assetBusy === 'signature'}
+                          onClick={() => handleDeleteSchoolAsset('signature')}
+                          className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900/60 dark:hover:bg-red-950/30"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Hapus
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Stempel Sekolah */}
+                <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-4 space-y-3 bg-slate-50/50 dark:bg-slate-900/30">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <Stamp className="w-4 h-4 text-[#0F2942] dark:text-blue-400" />
+                        Stempel Sekolah
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Menimpa tanda tangan, sedikit ke kiri, pada dokumen cetak.
+                      </p>
+                    </div>
+                    <ToggleSwitch
+                      size="sm"
+                      checked={school?.showSchoolStamp ?? true}
+                      disabled={!canUpdateSchool || assetBusy === 'toggle'}
+                      onChange={(next) => handleToggleSchoolAsset('showSchoolStamp', next)}
+                      label={school?.showSchoolStamp ?? true ? 'On' : 'Off'}
+                    />
+                  </div>
+
+                  <div className="h-32 rounded-md border border-slate-200 dark:border-slate-700 bg-white flex flex-col items-center justify-center p-3 overflow-hidden">
+                    {school?.schoolStampPath ? (
+                      <img
+                        src={`/api/school/assets?type=stamp&v=${assetVersion}`}
+                        alt="Stempel Sekolah"
+                        referrerPolicy="no-referrer"
+                        className={`max-h-24 max-w-full object-contain transition-opacity ${
+                          school.showSchoolStamp === false ? 'opacity-35' : 'opacity-100'
+                        }`}
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-400 text-center">
+                        Belum ada gambar stempel sekolah diunggah
+                      </span>
+                    )}
+                  </div>
+
+                  {canUpdateSchool && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={stampInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          e.target.value = '';
+                          void handleUploadSchoolAsset('stamp', file);
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={assetBusy === 'stamp'}
+                        onClick={() => stampInputRef.current?.click()}
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        {school?.schoolStampPath ? 'Ganti' : 'Unggah PNG'}
+                      </Button>
+                      {school?.schoolStampPath && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={assetBusy === 'stamp'}
+                          onClick={() => handleDeleteSchoolAsset('stamp')}
+                          className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-900/60 dark:hover:bg-red-950/30"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Hapus
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pratinjau Gabungan Posisi Cetak */}
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2.5">
+                  Pratinjau Gabungan pada Dokumen Cetak A4
+                </p>
+                <div className="bg-white text-slate-900 border border-slate-200 rounded-md px-5 py-6 max-w-xs text-center text-xs overflow-visible">
+                  <p className="relative z-0 font-medium">Kepala Sekolah,</p>
+                  <div className="relative overflow-visible h-16 flex items-center justify-center my-1">
+                    {(school?.showSchoolStamp ?? true) && school?.schoolStampPath && (
+                      <img
+                        src={`/api/school/assets?type=stamp&v=${assetVersion}`}
+                        alt="Pratinjau Stempel"
+                        referrerPolicy="no-referrer"
+                        className="pointer-events-none select-none absolute left-1/2 -translate-x-[72%] top-1/2 -translate-y-1/2 w-28 h-28 object-contain opacity-85 mix-blend-multiply z-10"
+                      />
+                    )}
+                    {(school?.showPrincipalSignature ?? true) && school?.principalSignaturePath && (
+                      <img
+                        src={`/api/school/assets?type=signature&v=${assetVersion}`}
+                        alt="Pratinjau Tanda Tangan"
+                        referrerPolicy="no-referrer"
+                        className="relative z-0 max-h-14 max-w-[160px] object-contain"
+                      />
+                    )}
+                  </div>
+                  <p className="relative z-0 font-semibold underline">
+                    {school?.principalName || 'Kepala Sekolah'}
+                  </p>
+                  <p className="relative z-0 font-mono text-[11px] text-slate-600">
+                    NIP {school?.principalNip || '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : loading ? (
           <TableSkeleton rows={8} />
         ) : activeTab === 'pengguna' ? (
@@ -949,25 +1316,25 @@ export default function PengaturanPage() {
 
             <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                    <tr>
-                      <th className="py-3 px-3 font-semibold">Nama & Username</th>
-                      <th className="py-3 px-3 font-semibold">Peran RBAC</th>
-                      <th className="py-3 px-3 font-semibold">Cakupan Akses</th>
-                      <th className="py-3 px-3 font-semibold">Status</th>
-                      <th className="py-3 px-3 font-semibold">Login Terakhir</th>
-                      <th className="py-3 px-3 font-semibold text-right">Aksi</th>
+                <table className="data-table text-left text-xs">
+                  <thead>
+                    <tr className="text-slate-600 dark:text-slate-300">
+                      <th className="py-3 px-3 font-semibold col-id">Nama & Username</th>
+                      <th className="py-3 px-3 font-semibold col-a col-sep">Peran RBAC</th>
+                      <th className="py-3 px-3 font-semibold col-a col-cell-div">Cakupan Akses</th>
+                      <th className="py-3 px-3 font-semibold col-total col-sep">Status</th>
+                      <th className="py-3 px-3 font-semibold col-b col-sep">Login Terakhir</th>
+                      <th className="py-3 px-3 font-semibold text-right col-action col-sep">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody>
                     {users.map((u) => {
                       const isSelf = u.id === user?.id;
                       const protectedSuperAdmin =
                         u.roleCode === 'SUPER_ADMIN' && user?.roleCode !== 'SUPER_ADMIN';
                       return (
-                        <tr key={u.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30">
-                          <td className="py-2.5 px-3">
+                        <tr key={u.id}>
+                          <td className="py-2.5 px-3 col-id">
                             <div className="font-medium text-slate-900 dark:text-slate-100">
                               {u.fullName} {isSelf && <span className="text-[11px] text-[#1D4ED8]">(Anda)</span>}
                             </div>
@@ -975,20 +1342,20 @@ export default function PengaturanPage() {
                               @{u.username} · {u.email}
                             </div>
                           </td>
-                          <td className="py-2.5 px-3 font-medium">
+                          <td className="py-2.5 px-3 font-medium col-a col-sep">
                             <div>{u.roleName}</div>
                             <div className="text-[11px] font-mono text-slate-400">{u.roleCode}</div>
                           </td>
-                          <td className="py-2.5 px-3">{renderScopeSummary(u)}</td>
-                          <td className="py-2.5 px-3">
-                            <span className={u.isActive ? 'text-emerald-700 font-medium' : 'text-red-600 font-medium'}>
+                          <td className="py-2.5 px-3 col-a col-cell-div">{renderScopeSummary(u)}</td>
+                          <td className="py-2.5 px-3 col-total col-sep">
+                            <span className={u.isActive ? 'text-emerald-700 dark:text-emerald-400 font-medium' : 'text-red-600 font-medium'}>
                               {u.isActive ? 'Aktif' : 'Nonaktif'}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">
-                            {u.lastLoginAt ? u.lastLoginAt.slice(0, 16).replace('T', ' ') : '-'}
+                          <td className="py-2.5 px-3 tabular-nums whitespace-nowrap text-slate-500 col-b col-sep">
+                            {u.lastLoginAt ? formatIndoDateTime(u.lastLoginAt) : '-'}
                           </td>
-                          <td className="py-2.5 px-3 text-right">
+                          <td className="py-2.5 px-3 text-right col-action col-sep">
                             <div className="inline-flex items-center gap-1.5">
                               {canUpdateUsers && (
                                 <>
@@ -1053,8 +1420,8 @@ export default function PengaturanPage() {
                     <div>
                       <span className="font-semibold">{l.actorName}:</span> {l.details}
                     </div>
-                    <span className="font-mono text-[11px] text-slate-400 shrink-0 tabular-nums">
-                      {l.createdAt.slice(0, 16).replace('T', ' ')}
+                    <span className="text-[11px] text-slate-400 shrink-0 tabular-nums whitespace-nowrap">
+                      {formatIndoDateTime(l.createdAt)}
                     </span>
                   </div>
                 ))}
@@ -1234,13 +1601,28 @@ export default function PengaturanPage() {
                   {/* 17 x 6 Matrix Table */}
                   <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 sticky top-0 z-10">
-                          <tr>
-                            <th className="py-2.5 px-3 font-semibold min-w-[230px]">
+                      <table className="data-table text-left text-xs">
+                        <thead className="sticky top-0 z-10">
+                          <tr className="th-groups text-[10px] uppercase tracking-wider">
+                            <th className="py-1.5 px-3 font-semibold col-id">Modul</th>
+                            <th colSpan={2} className="py-1.5 px-2 font-semibold text-center col-a col-sep">
+                              Akses Dasar
+                            </th>
+                            <th colSpan={2} className="py-1.5 px-2 font-semibold text-center col-b col-sep">
+                              Modifikasi
+                            </th>
+                            <th colSpan={2} className="py-1.5 px-2 font-semibold text-center col-c col-sep">
+                              Khusus
+                            </th>
+                            <th className="py-1.5 px-2 font-semibold text-center col-total col-sep">
+                              Baris
+                            </th>
+                          </tr>
+                          <tr className="text-slate-700 dark:text-slate-200">
+                            <th className="py-2 px-3 font-semibold min-w-[230px] col-id">
                               Modul Aplikasi (17 Modul)
                             </th>
-                            {ALL_ACTIONS.map((action) => {
+                            {ALL_ACTIONS.map((action, actIdx) => {
                               const colKeys = ALL_MODULES.map((m) => `${m}:${action}`);
                               const unlockedCol =
                                 selectedRole.code === 'SUPER_ADMIN'
@@ -1249,8 +1631,14 @@ export default function PengaturanPage() {
                               const allColChecked =
                                 unlockedCol.length > 0 &&
                                 unlockedCol.every((k) => draftPermissions.has(k));
+                              const grpClass =
+                                actIdx < 2 ? 'col-a' : actIdx < 4 ? 'col-b' : 'col-c';
+                              const sepClass = actIdx % 2 === 0 ? 'col-sep' : 'col-cell-div';
                               return (
-                                <th key={action} className="py-2.5 px-2 text-center font-semibold w-16">
+                                <th
+                                  key={action}
+                                  className={`py-2 px-2 text-center font-semibold w-16 ${grpClass} ${sepClass}`}
+                                >
                                   <label className="inline-flex flex-col items-center gap-1 cursor-pointer select-none">
                                     <span>{ACTION_LABELS[action]}</span>
                                     <input
@@ -1265,10 +1653,12 @@ export default function PengaturanPage() {
                                 </th>
                               );
                             })}
-                            <th className="py-2.5 px-2 text-center font-semibold w-16">Semua</th>
+                            <th className="py-2 px-2 text-center font-semibold w-16 col-total col-sep">
+                              Semua
+                            </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        <tbody>
                           {ALL_MODULES.map((mod) => {
                             const meta = MODULE_METADATA[mod];
                             const rowKeys = ALL_ACTIONS.map((a) => `${mod}:${a}`);
@@ -1281,11 +1671,8 @@ export default function PengaturanPage() {
                               unlockedRow.every((k) => draftPermissions.has(k));
 
                             return (
-                              <tr
-                                key={mod}
-                                className="hover:bg-slate-50/70 dark:hover:bg-slate-800/30"
-                              >
-                                <td className="py-2 px-3">
+                              <tr key={mod}>
+                                <td className="py-2 px-3 col-id">
                                   <div className="font-medium text-slate-900 dark:text-slate-100">
                                     {meta.label}
                                   </div>
@@ -1293,14 +1680,20 @@ export default function PengaturanPage() {
                                     <span className="font-mono">{mod}</span> · {meta.description}
                                   </div>
                                 </td>
-                                {ALL_ACTIONS.map((action) => {
+                                {ALL_ACTIONS.map((action, actIdx) => {
                                   const key = `${mod}:${action}`;
                                   const isLockedKey =
                                     selectedRole.code === 'SUPER_ADMIN' &&
                                     LOCKED_SUPER_ADMIN_PERMISSIONS.includes(key);
                                   const checked = draftPermissions.has(key);
+                                  const grpClass =
+                                    actIdx < 2 ? 'col-a' : actIdx < 4 ? 'col-b' : 'col-c';
+                                  const sepClass = actIdx % 2 === 0 ? 'col-sep' : 'col-cell-div';
                                   return (
-                                    <td key={action} className="py-2 px-2 text-center">
+                                    <td
+                                      key={action}
+                                      className={`py-2 px-2 text-center ${grpClass} ${sepClass}`}
+                                    >
                                       <div className="inline-flex items-center justify-center gap-1">
                                         <input
                                           type="checkbox"
@@ -1322,7 +1715,7 @@ export default function PengaturanPage() {
                                     </td>
                                   );
                                 })}
-                                <td className="py-2 px-2 text-center">
+                                <td className="py-2 px-2 text-center col-total col-sep">
                                   <input
                                     type="checkbox"
                                     checked={allRowChecked}
@@ -1367,17 +1760,17 @@ export default function PengaturanPage() {
             )}
 
             <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+              <table className="data-table text-left text-xs">
+                <thead>
                   <tr>
-                    <th className="py-3 px-3 font-semibold">Nama Berkas</th>
-                    <th className="py-3 px-3 font-semibold">Catatan</th>
-                    <th className="py-3 px-3 font-semibold text-right">Ukuran</th>
-                    <th className="py-3 px-3 font-semibold">Checksum SHA-256</th>
-                    <th className="py-3 px-3 font-semibold text-right">Aksi</th>
+                    <th className="py-3 px-3 font-semibold col-id">Nama Berkas</th>
+                    <th className="py-3 px-3 font-semibold col-a col-sep">Catatan</th>
+                    <th className="py-3 px-3 font-semibold text-right col-total col-sep">Ukuran</th>
+                    <th className="py-3 px-3 font-semibold col-b col-sep">Checksum SHA-256</th>
+                    <th className="py-3 px-3 font-semibold text-right col-action col-sep">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {backups.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-8 text-center text-slate-500">
@@ -1387,15 +1780,15 @@ export default function PengaturanPage() {
                   ) : (
                     backups.map((b) => (
                       <tr key={b.id}>
-                        <td className="py-2.5 px-3 font-mono font-medium">{b.fileName}</td>
-                        <td className="py-2.5 px-3">{b.notes || '-'}</td>
-                        <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                        <td className="py-2.5 px-3 font-mono font-medium col-id">{b.fileName}</td>
+                        <td className="py-2.5 px-3 col-a col-sep">{b.notes || '-'}</td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums col-total col-sep">
                           {Math.round(b.sizeBytes / 1024)} KB
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500 col-b col-sep">
                           {b.checksum.slice(0, 16)}...
                         </td>
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-2.5 px-3 text-right col-action col-sep">
                           <div className="inline-flex items-center gap-1.5">
                             {canExportBackup && (
                               <a href={`/api/backup?download=${encodeURIComponent(b.fileName)}`}>

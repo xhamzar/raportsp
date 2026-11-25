@@ -197,42 +197,46 @@ export default function GuruPage() {
         ) : tab === 'guru' ? (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold w-10">No</th>
-                    <th className="py-3 px-3 font-semibold">Nama Pendidik</th>
-                    <th className="py-3 px-3 font-semibold">NIP / NUPTK</th>
-                    <th className="py-3 px-3 font-semibold">Status & Pendidikan</th>
-                    <th className="py-3 px-3 font-semibold">Bidang / Penugasan</th>
-                    <th className="py-3 px-3 font-semibold text-right">Beban JP</th>
-                    <th className="py-3 px-3 font-semibold text-right">Aksi</th>
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-3 px-3 font-semibold w-10 col-id">No</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">Nama Pendidik</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">NIP / NUPTK</th>
+                    <th className="py-3 px-3 font-semibold col-a col-sep">Status & Pendidikan</th>
+                    <th className="py-3 px-3 font-semibold col-b col-sep">Bidang / Penugasan</th>
+                    <th className="py-3 px-3 font-semibold text-right col-total col-sep">
+                      Beban JP
+                    </th>
+                    <th className="py-3 px-3 font-semibold text-right col-action col-sep">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {teachers.map((t, idx) => (
-                    <tr key={t.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">{idx + 1}</td>
-                      <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100">
+                    <tr key={t.id}>
+                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500 col-id">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100 col-id col-cell-div">
                         {t.fullName}
                       </td>
-                      <td className="py-2.5 px-3 font-mono tabular-nums">
+                      <td className="py-2.5 px-3 font-mono tabular-nums col-id col-cell-div">
                         <div>{t.nip || '-'}</div>
                         <div className="text-[11px] text-slate-500">NUPTK: {t.nuptk || '-'}</div>
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-a col-sep">
                         {t.employmentStatus} · {t.education}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-b col-sep">
                         <div>{t.specialization}</div>
                         <div className="text-[11px] text-slate-500">
                           {t.assignments.map((a) => `${a.assignmentType} (${a.className})`).join(', ') || '-'}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold">
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold col-total col-sep">
                         {t.weeklyHours} JP
                       </td>
-                      <td className="py-2.5 px-3 text-right">
+                      <td className="py-2.5 px-3 text-right col-action col-sep">
                         {can('guru', 'update') && (
                           <button
                             type="button"
@@ -251,26 +255,32 @@ export default function GuruPage() {
           </div>
         ) : (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+            <table className="data-table text-left text-xs">
+              <thead>
                 <tr>
-                  <th className="py-3 px-3 font-semibold w-10">No</th>
-                  <th className="py-3 px-3 font-semibold">Nama Lengkap</th>
-                  <th className="py-3 px-3 font-semibold">NIP</th>
-                  <th className="py-3 px-3 font-semibold">Jabatan</th>
-                  <th className="py-3 px-3 font-semibold">Status</th>
-                  <th className="py-3 px-3 font-semibold">Telepon</th>
+                  <th className="py-3 px-3 font-semibold w-10 col-id">No</th>
+                  <th className="py-3 px-3 font-semibold col-id col-cell-div">Nama Lengkap</th>
+                  <th className="py-3 px-3 font-semibold col-id col-cell-div">NIP</th>
+                  <th className="py-3 px-3 font-semibold col-a col-sep">Jabatan</th>
+                  <th className="py-3 px-3 font-semibold col-a col-cell-div">Status</th>
+                  <th className="py-3 px-3 font-semibold col-b col-sep">Telepon</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody>
                 {staff.map((s, idx) => (
                   <tr key={s.id}>
-                    <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">{idx + 1}</td>
-                    <td className="py-2.5 px-3 font-medium">{s.fullName}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums">{s.nip || '-'}</td>
-                    <td className="py-2.5 px-3">{s.position}</td>
-                    <td className="py-2.5 px-3">{s.employmentStatus}</td>
-                    <td className="py-2.5 px-3 font-mono tabular-nums">{s.phone || '-'}</td>
+                    <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500 col-id">
+                      {idx + 1}
+                    </td>
+                    <td className="py-2.5 px-3 font-medium col-id col-cell-div">{s.fullName}</td>
+                    <td className="py-2.5 px-3 font-mono tabular-nums col-id col-cell-div">
+                      {s.nip || '-'}
+                    </td>
+                    <td className="py-2.5 px-3 col-a col-sep">{s.position}</td>
+                    <td className="py-2.5 px-3 col-a col-cell-div">{s.employmentStatus}</td>
+                    <td className="py-2.5 px-3 font-mono tabular-nums col-b col-sep">
+                      {s.phone || '-'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

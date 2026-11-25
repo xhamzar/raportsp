@@ -370,3 +370,67 @@ export function TabBar({
     </div>
   );
 }
+
+export function ToggleSwitch({
+  checked,
+  onChange,
+  disabled = false,
+  label,
+  description,
+  size = 'md',
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  label?: string;
+  description?: string;
+  size?: 'sm' | 'md';
+}) {
+  const isSm = size === 'sm';
+  return (
+    <label
+      className={cn(
+        'inline-flex items-center gap-2.5 select-none',
+        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+      )}
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label || 'Saklar status'}
+        disabled={disabled}
+        onClick={() => !disabled && onChange(!checked)}
+        className={cn(
+          'relative inline-flex shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-1',
+          isSm ? 'h-5 w-9' : 'h-6 w-11',
+          checked ? 'bg-[#0F2942] dark:bg-[#1D4ED8]' : 'bg-slate-300 dark:bg-slate-700',
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer'
+        )}
+      >
+        <span
+          className={cn(
+            'pointer-events-none inline-block rounded-full bg-white shadow-sm transition-transform duration-150',
+            isSm ? 'h-4 w-4' : 'h-5 w-5',
+            checked ? (isSm ? 'translate-x-4' : 'translate-x-5') : 'translate-x-0'
+          )}
+        />
+      </button>
+      {(label || description) && (
+        <span className="min-w-0">
+          {label && (
+            <span className="block text-xs font-medium text-slate-800 dark:text-slate-100 whitespace-nowrap">
+              {label}
+            </span>
+          )}
+          {description && (
+            <span className="block text-[11px] text-slate-500 dark:text-slate-400">
+              {description}
+            </span>
+          )}
+        </span>
+      )}
+    </label>
+  );
+}
+

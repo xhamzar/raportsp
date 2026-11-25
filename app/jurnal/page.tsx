@@ -13,6 +13,7 @@ import {
   Select,
   TableSkeleton,
 } from '@/components/ui/Primitives';
+import { formatIndoDate } from '@/lib/utils';
 
 interface JournalRow {
   id: number;
@@ -201,43 +202,45 @@ export default function JurnalPage() {
         ) : (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold w-28">Tanggal / JP</th>
-                    <th className="py-3 px-3 font-semibold">Mata Pelajaran & Guru</th>
-                    <th className="py-3 px-3 font-semibold">Materi & Tujuan</th>
-                    <th className="py-3 px-3 font-semibold">Aktivitas Kelas</th>
-                    <th className="py-3 px-3 font-semibold">Ketuntasan</th>
-                    <th className="py-3 px-3 font-semibold text-right">Aksi</th>
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-3 px-3 font-semibold w-36 col-id">Tanggal / JP</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">
+                      Mata Pelajaran & Guru
+                    </th>
+                    <th className="py-3 px-3 font-semibold col-a col-sep">Materi & Tujuan</th>
+                    <th className="py-3 px-3 font-semibold col-b col-sep">Aktivitas Kelas</th>
+                    <th className="py-3 px-3 font-semibold col-total col-sep">Ketuntasan</th>
+                    <th className="py-3 px-3 font-semibold text-right col-action col-sep">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {journals.map((j) => (
-                    <tr key={j.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                      <td className="py-3 px-3 align-top">
-                        <div className="font-mono tabular-nums font-medium">{j.date}</div>
+                    <tr key={j.id}>
+                      <td className="py-3 px-3 align-top col-id">
+                        <div className="tabular-nums font-medium whitespace-nowrap">{formatIndoDate(j.date)}</div>
                         <div className="text-[11px] text-slate-500">Jam {j.lessonHour}</div>
                       </td>
-                      <td className="py-3 px-3 align-top">
+                      <td className="py-3 px-3 align-top col-id col-cell-div">
                         <div className="font-semibold text-slate-900 dark:text-slate-100">
                           {j.subjectName}
                         </div>
                         <div className="text-[11px] text-slate-500">{j.teacherName}</div>
                       </td>
-                      <td className="py-3 px-3 align-top max-w-xs">
+                      <td className="py-3 px-3 align-top max-w-xs col-a col-sep">
                         <div className="font-medium text-slate-800 dark:text-slate-200">
                           {j.material}
                         </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">{j.objectiveSummary}</div>
                       </td>
-                      <td className="py-3 px-3 align-top max-w-xs text-slate-600 dark:text-slate-300">
+                      <td className="py-3 px-3 align-top max-w-xs text-slate-600 dark:text-slate-300 col-b col-sep">
                         {j.activities}
                       </td>
-                      <td className="py-3 px-3 align-top font-medium">
+                      <td className="py-3 px-3 align-top font-medium col-total col-sep">
                         {j.completionStatus}
                       </td>
-                      <td className="py-3 px-3 align-top text-right">
+                      <td className="py-3 px-3 align-top text-right col-action col-sep">
                         {can('kurikulum', 'delete') && (
                           <button
                             type="button"

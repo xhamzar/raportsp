@@ -577,27 +577,50 @@ function PenilaianInner() {
         ) : activeTab === 'sumatif' ? (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold w-10">No</th>
-                    <th className="py-3 px-3 font-semibold">Nama Murid</th>
-                    <th className="py-3 px-2 font-semibold text-right">LM 1</th>
-                    <th className="py-3 px-2 font-semibold text-right">LM 2</th>
-                    <th className="py-3 px-2 font-semibold text-right">LM 3</th>
-                    <th className="py-3 px-2 font-semibold text-right">STS</th>
-                    <th className="py-3 px-2 font-semibold text-right">SAS</th>
-                    <th className="py-3 px-2 font-semibold text-right">Remedial</th>
-                    <th className="py-3 px-3 font-semibold text-right">Nilai Tengah</th>
-                    <th className="py-3 px-3 font-semibold text-right">Nilai Rapor</th>
-                    {canUpdateScores && <th className="py-3 px-3 font-semibold text-right">Aksi</th>}
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="th-groups text-[10px] uppercase tracking-wider">
+                    <th colSpan={2} className="py-1.5 px-3 font-semibold col-id">
+                      Identitas Murid
+                    </th>
+                    <th colSpan={3} className="py-1.5 px-2 font-semibold text-center col-a col-sep">
+                      Lingkup Materi
+                    </th>
+                    <th colSpan={3} className="py-1.5 px-2 font-semibold text-center col-b col-sep">
+                      Asesmen Akhir
+                    </th>
+                    <th colSpan={2} className="py-1.5 px-3 font-semibold text-center col-total col-sep">
+                      Ringkasan Nilai
+                    </th>
+                    {canUpdateScores && (
+                      <th className="py-1.5 px-3 font-semibold text-right col-action col-sep">
+                        &nbsp;
+                      </th>
+                    )}
+                  </tr>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-2.5 px-3 font-semibold w-10 col-id">No</th>
+                    <th className="py-2.5 px-3 font-semibold col-id col-cell-div">Nama Murid</th>
+                    <th className="py-2.5 px-2 font-semibold text-right col-a col-sep">LM 1</th>
+                    <th className="py-2.5 px-2 font-semibold text-right col-a col-cell-div">LM 2</th>
+                    <th className="py-2.5 px-2 font-semibold text-right col-a col-cell-div">LM 3</th>
+                    <th className="py-2.5 px-2 font-semibold text-right col-b col-sep">STS</th>
+                    <th className="py-2.5 px-2 font-semibold text-right col-b col-cell-div">SAS</th>
+                    <th className="py-2.5 px-2 font-semibold text-right col-b col-cell-div">Remedial</th>
+                    <th className="py-2.5 px-3 font-semibold text-right col-total col-sep">Nilai Tengah</th>
+                    <th className="py-2.5 px-3 font-semibold text-right col-total col-cell-div">Nilai Rapor</th>
+                    {canUpdateScores && (
+                      <th className="py-2.5 px-3 font-semibold text-right col-action col-sep">Aksi</th>
+                    )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {summativeRows.map((row, idx) => (
-                    <tr key={row.studentId} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">{idx + 1}</td>
-                      <td className="py-2.5 px-3">
+                    <tr key={row.studentId}>
+                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500 col-id">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3 col-id col-cell-div">
                         <div className="font-medium text-slate-900 dark:text-slate-100">
                           {row.fullName}
                         </div>
@@ -605,28 +628,32 @@ function PenilaianInner() {
                           {row.nisn}
                         </div>
                       </td>
-                      <td className="py-2.5 px-2 text-right font-mono tabular-nums">{row.lm1 ?? '-'}</td>
-                      <td className="py-2.5 px-2 text-right font-mono tabular-nums">{row.lm2 ?? '-'}</td>
-                      <td className="py-2.5 px-2 text-right font-mono tabular-nums">{row.lm3 ?? '-'}</td>
-                      <td className="py-2.5 px-2 text-right font-mono tabular-nums">{row.sts ?? '-'}</td>
-                      <td className="py-2.5 px-2 text-right font-mono tabular-nums">{row.sas ?? '-'}</td>
-                      <td className="py-2.5 px-2 text-right font-mono tabular-nums">
+                      <td className="py-2.5 px-2 text-right font-mono tabular-nums col-a col-sep">
+                        {row.lm1 ?? '-'}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono tabular-nums col-a col-cell-div">
+                        {row.lm2 ?? '-'}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono tabular-nums col-a col-cell-div">
+                        {row.lm3 ?? '-'}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono tabular-nums col-b col-sep">
+                        {row.sts ?? '-'}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono tabular-nums col-b col-cell-div">
+                        {row.sas ?? '-'}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono tabular-nums col-b col-cell-div">
                         {row.remedialScore ?? '-'}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-600 dark:text-slate-300">
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-200 col-total col-sep">
                         {row.midtermScore !== null ? row.midtermScore.toFixed(1) : '-'}
                       </td>
-                      <td
-                        className={`py-2.5 px-3 text-right font-mono tabular-nums font-bold ${
-                          row.finalScore !== null && !row.kktpPassed
-                            ? 'text-red-600 dark:text-red-400'
-                            : 'text-[#0F2942] dark:text-blue-400'
-                        }`}
-                      >
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-slate-100 col-total col-cell-div">
                         {row.finalScore !== null ? Math.round(row.finalScore) : '-'}
                       </td>
                       {canUpdateScores && (
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-2.5 px-3 text-right col-action col-sep">
                           <Button size="sm" variant="outline" onClick={() => openEditScore(row)}>
                             Input
                           </Button>
@@ -662,7 +689,7 @@ function PenilaianInner() {
                     {stu.items.map((item) => (
                       <div
                         key={item.tpId}
-                        className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 odd:bg-white dark:odd:bg-transparent even:bg-slate-50/60 dark:even:bg-slate-900/30 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 focus-within:bg-blue-50/70 dark:focus-within:bg-blue-950/30 transition-colors"
                       >
                         <div className="min-w-0">
                           <div className="text-xs font-semibold text-[#0F2942] dark:text-blue-400">
@@ -717,19 +744,21 @@ function PenilaianInner() {
                   </p>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                  <table className="data-table text-left text-xs">
+                    <thead>
                       <tr>
-                        <th className="py-2.5 px-3 font-semibold">Nama Murid</th>
-                        <th className="py-2.5 px-3 font-semibold w-44">Predikat</th>
-                        <th className="py-2.5 px-3 font-semibold">Deskripsi Capaian Projek</th>
+                        <th className="py-2.5 px-3 font-semibold col-id">Nama Murid</th>
+                        <th className="py-2.5 px-3 font-semibold w-44 col-a col-sep">Predikat</th>
+                        <th className="py-2.5 px-3 font-semibold col-b col-sep">
+                          Deskripsi Capaian Projek
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody>
                       {proj.scores.map((sc) => (
                         <tr key={sc.studentId}>
-                          <td className="py-2.5 px-3 font-medium">{sc.fullName}</td>
-                          <td className="py-2.5 px-3">
+                          <td className="py-2.5 px-3 font-medium col-id">{sc.fullName}</td>
+                          <td className="py-2.5 px-3 col-a col-sep">
                             <select
                               value={sc.predicate}
                               disabled={!canUpdateScores}
@@ -744,7 +773,7 @@ function PenilaianInner() {
                               <option value="Perlu Bimbingan">Perlu Bimbingan</option>
                             </select>
                           </td>
-                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
+                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 col-b col-sep">
                             {sc.description || '-'}
                           </td>
                         </tr>
@@ -771,19 +800,21 @@ function PenilaianInner() {
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                  <table className="data-table text-left text-xs">
+                    <thead>
                       <tr>
-                        <th className="py-2.5 px-3 font-semibold">Nama Murid</th>
-                        <th className="py-2.5 px-3 font-semibold w-44">Predikat</th>
-                        <th className="py-2.5 px-3 font-semibold">Keterangan Pembina</th>
+                        <th className="py-2.5 px-3 font-semibold col-id">Nama Murid</th>
+                        <th className="py-2.5 px-3 font-semibold w-44 col-a col-sep">Predikat</th>
+                        <th className="py-2.5 px-3 font-semibold col-b col-sep">
+                          Keterangan Pembina
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody>
                       {eks.scores.map((sc) => (
                         <tr key={sc.studentId}>
-                          <td className="py-2.5 px-3 font-medium">{sc.fullName}</td>
-                          <td className="py-2.5 px-3">
+                          <td className="py-2.5 px-3 font-medium col-id">{sc.fullName}</td>
+                          <td className="py-2.5 px-3 col-a col-sep">
                             <select
                               value={sc.predicate === '-' ? 'Baik' : sc.predicate}
                               disabled={!canUpdateScores}
@@ -798,7 +829,7 @@ function PenilaianInner() {
                               <option value="Kurang">Kurang</option>
                             </select>
                           </td>
-                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
+                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 col-b col-sep">
                             {sc.description || '-'}
                           </td>
                         </tr>
@@ -863,7 +894,7 @@ function PenilaianInner() {
                   {stu.items.map((item) => (
                     <div
                       key={item.indicatorId}
-                      className="px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-center"
+                      className="px-4 py-3 grid grid-cols-1 lg:grid-cols-12 gap-2.5 items-center odd:bg-white dark:odd:bg-transparent even:bg-slate-50/60 dark:even:bg-slate-900/30 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 focus-within:bg-blue-50/70 dark:focus-within:bg-blue-950/30 transition-colors"
                     >
                       <div className="lg:col-span-3">
                         <p className="text-[11px] text-slate-500">{item.category}</p>
@@ -978,7 +1009,10 @@ function PenilaianInner() {
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {homeroomNotes.map((item, index) => (
-                <div key={item.studentId} className="py-3 grid grid-cols-1 lg:grid-cols-12 gap-3">
+                <div
+                  key={item.studentId}
+                  className="py-3 px-2 rounded grid grid-cols-1 lg:grid-cols-12 gap-3 odd:bg-white dark:odd:bg-transparent even:bg-slate-50/60 dark:even:bg-slate-900/30 hover:bg-blue-50/40 dark:hover:bg-blue-950/20 focus-within:bg-blue-50/70 dark:focus-within:bg-blue-950/30 transition-colors"
+                >
                   <div className="lg:col-span-3 font-medium text-xs text-slate-900 dark:text-slate-100 pt-1">
                     {index + 1}. {item.fullName}
                   </div>

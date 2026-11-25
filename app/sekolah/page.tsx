@@ -6,6 +6,7 @@ import { Calendar, Plus, Save, School } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
 import { Button, Input, Modal, Select, TabBar, TableSkeleton } from '@/components/ui/Primitives';
+import { formatIndoDateRange } from '@/lib/utils';
 
 interface SchoolData {
   school: {
@@ -432,25 +433,27 @@ function SekolahInner() {
                 )}
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                    <tr>
-                      <th className="py-2.5 px-4 font-semibold">Tanggal</th>
-                      <th className="py-2.5 px-4 font-semibold">Kegiatan / Agenda</th>
-                      <th className="py-2.5 px-4 font-semibold">Kategori</th>
-                      <th className="py-2.5 px-4 font-semibold">Status Hari</th>
+                <table className="data-table text-left text-xs">
+                  <thead>
+                    <tr className="text-slate-600 dark:text-slate-300">
+                      <th className="py-2.5 px-4 font-semibold col-id">Tanggal</th>
+                      <th className="py-2.5 px-4 font-semibold col-id col-cell-div">
+                        Kegiatan / Agenda
+                      </th>
+                      <th className="py-2.5 px-4 font-semibold col-a col-sep">Kategori</th>
+                      <th className="py-2.5 px-4 font-semibold col-total col-sep">Status Hari</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody>
                     {data.calendars.map((c) => (
-                      <tr key={c.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                        <td className="py-2.5 px-4 font-mono tabular-nums whitespace-nowrap">
-                          {c.startDate === c.endDate ? c.startDate : `${c.startDate} s.d. ${c.endDate}`}
+                      <tr key={c.id}>
+                        <td className="py-2.5 px-4 tabular-nums whitespace-nowrap col-id">
+                          {formatIndoDateRange(c.startDate, c.endDate)}
                         </td>
-                        <td className="py-2.5 px-4 font-medium">{c.title}</td>
-                        <td className="py-2.5 px-4 text-slate-500">{c.category}</td>
-                        <td className="py-2.5 px-4">
-                          <span className={c.isHoliday ? 'text-red-600 font-medium' : 'text-emerald-700'}>
+                        <td className="py-2.5 px-4 font-medium col-id col-cell-div">{c.title}</td>
+                        <td className="py-2.5 px-4 text-slate-500 col-a col-sep">{c.category}</td>
+                        <td className="py-2.5 px-4 col-total col-sep">
+                          <span className={c.isHoliday ? 'text-red-600 font-medium' : 'text-emerald-700 dark:text-emerald-400 font-medium'}>
                             {c.isHoliday ? 'Hari Libur' : 'Hari Efektif'}
                           </span>
                         </td>
@@ -480,14 +483,30 @@ function SekolahInner() {
                   <div className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold">
                     Daftar Ruang Kelas
                   </div>
-                  <table className="w-full text-xs">
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <table className="data-table text-left text-xs">
+                    <thead>
+                      <tr>
+                        <th className="py-2 px-3 font-semibold col-id">Kode</th>
+                        <th className="py-2 px-3 font-semibold col-id col-cell-div">Ruang Kelas</th>
+                        <th className="py-2 px-3 font-semibold text-right col-total col-sep">
+                          Kapasitas
+                        </th>
+                        <th className="py-2 px-3 font-semibold text-right col-b col-sep">
+                          Kondisi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {data.classrooms.map((r) => (
                         <tr key={r.id}>
-                          <td className="py-2 px-3 font-mono">{r.code}</td>
-                          <td className="py-2 px-3 font-medium">{r.name}</td>
-                          <td className="py-2 px-3 text-right tabular-nums">{r.capacity} kursi</td>
-                          <td className="py-2 px-3 text-right text-emerald-700">{r.condition}</td>
+                          <td className="py-2 px-3 font-mono col-id">{r.code}</td>
+                          <td className="py-2 px-3 font-medium col-id col-cell-div">{r.name}</td>
+                          <td className="py-2 px-3 text-right tabular-nums col-total col-sep">
+                            {r.capacity} kursi
+                          </td>
+                          <td className="py-2 px-3 text-right text-emerald-700 dark:text-emerald-400 col-b col-sep">
+                            {r.condition}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -498,14 +517,30 @@ function SekolahInner() {
                   <div className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold">
                     Sarana & Fasilitas Sekolah
                   </div>
-                  <table className="w-full text-xs">
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <table className="data-table text-left text-xs">
+                    <thead>
+                      <tr>
+                        <th className="py-2 px-3 font-semibold col-id">Nama Fasilitas</th>
+                        <th className="py-2 px-3 font-semibold col-a col-sep">Kategori</th>
+                        <th className="py-2 px-3 font-semibold text-right col-total col-sep">
+                          Jumlah
+                        </th>
+                        <th className="py-2 px-3 font-semibold text-right col-b col-sep">
+                          Kondisi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
                       {data.facilities.map((f) => (
                         <tr key={f.id}>
-                          <td className="py-2 px-3 font-medium">{f.name}</td>
-                          <td className="py-2 px-3 text-slate-500">{f.category}</td>
-                          <td className="py-2 px-3 text-right tabular-nums">{f.quantity} unit</td>
-                          <td className="py-2 px-3 text-right text-emerald-700">{f.condition}</td>
+                          <td className="py-2 px-3 font-medium col-id">{f.name}</td>
+                          <td className="py-2 px-3 text-slate-500 col-a col-sep">{f.category}</td>
+                          <td className="py-2 px-3 text-right tabular-nums col-total col-sep">
+                            {f.quantity} unit
+                          </td>
+                          <td className="py-2 px-3 text-right text-emerald-700 dark:text-emerald-400 col-b col-sep">
+                            {f.condition}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

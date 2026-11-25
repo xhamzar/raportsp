@@ -34,6 +34,13 @@ import {
   sanitizeFilename,
 } from '../lib/utils/sanitize';
 import {
+  formatIndoDate,
+  formatIndoDateRange,
+  formatIndoDateTime,
+  formatIndoEndOfMonthDate,
+  formatIndoMonthYear,
+} from '../lib/utils';
+import {
   assessmentWeightSchema,
   dapodikConfigSchema,
   keasramaanIndicatorSchema,
@@ -71,6 +78,14 @@ import {
   resolveStoredStudentPhotoPath,
   saveStudentPhotoFile,
 } from '../lib/server/services/student-photo';
+import {
+  deleteSchoolAssetFile,
+  readSchoolAssetFile,
+  resolveSchoolAssetPath,
+  saveSchoolAssetFile,
+} from '../lib/server/services/school-assets';
+import { resolveTutorialGuide } from '../lib/tutorial-guides';
+import { buildPdfFileName, computePageSlices } from '../lib/pdf-renderer';
 import { getDb, resetDbConnection } from '../lib/server/db';
 import {
   classes,
@@ -827,6 +842,89 @@ test('Validasi Zod detail murid terstruktur (NIK, alamat, orang tua, wali, dan w
   });
   assert.equal(badNik.success, false);
 });
+
+test('Pemformatan tanggal Indonesia baku KBBI (1 Februari 2016)', () => {
+  assert.equal(formatIndoDate('2016-02-01'), '1 Februari 2016');
+  assert.equal(formatIndoDate('2026-11-24T08:30:15Z'), '24 November 2026');
+  assert.equal(formatIndoDate(''), '-');
+  assert.equal(formatIndoDate(null), '-');
+  assert.equal(formatIndoDateTime('2026-11-24T08:30:15Z'), '24 November 2026, 08:30');
+  assert.equal(formatIndoDateRange('2016-02-01', '2016-02-01'), '1 Februari 2016');
+  assert.equal(
+    formatIndoDateRange('2016-02-01', '2016-02-05'),
+    '1 Februari 2016 s.d. 5 Februari 2016'
+  );
+  assert.equal(formatIndoMonthYear('2016-02'), 'Februari 2016');
+  assert.equal(formatIndoEndOfMonthDate('2016-02'), '29 Februari 2016');
+});
+
+test('Penyimpanan aman tanda tangan & stempel sekolah serta resolusi panduan tutorial per menu', () => {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sekolahkita-assets-'));
+  const prevPath = process.env.DATABASE_PATH;
+  process.env.DATABASE_PATH = path.join(tmpDir, 'assets.db');
+  resetDbConnection();
+
+  try {
+    const pngBytes = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+    ]);
+    const invalidBytes = Buffer.from('<svg onload="alert(1)"></svg>');
+    assert.throws(() => saveSchoolAssetFile('signature', invalidBytes), /Format gambar tidak valid/);
+
+    const sig = saveSchoolAssetFile('signature', pngBytes);
+    assert.ok(sig.fileName.startsWith('signature-') && sig.fileName.endsWith('.png'));
+    const loadedSig = readSchoolAssetFile(sig.fileName);
+    assert.equal(loadedSig?.contentType, 'image/png');
+    assert.equal(loadedSig?.buffer.equals(pngBytes), true);
+
+    const stamp = saveSchoolAssetFile('stamp', pngBytes);
+    assert.ok(stamp.fileName.startsWith('stamp-') && stamp.fileName.endsWith('.png'));
+
+    assert.equal(resolveSchoolAssetPath('../etc/passwd'), null);
+    assert.equal(resolveSchoolAssetPath('nested/stamp.png'), null);
+    assert.ok(resolveSchoolAssetPath(stamp.fileName));
+
+    assert.equal(deleteSchoolAssetFile(sig.fileName), true);
+    assert.equal(readSchoolAssetFile(sig.fileName), null);
+    assert.equal(deleteSchoolAssetFile(stamp.fileName), true);
+  } finally {
+    resetDbConnection();
+    if (prevPath === undefined) delete process.env.DATABASE_PATH;
+    else process.env.DATABASE_PATH = prevPath;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+
+  assert.equal(resolveTutorialGuide('/kurikulum').menuLabel, 'Kurikulum & RPM');
+  assert.ok(resolveTutorialGuide('/kurikulum').warning);
+  assert.equal(resolveTutorialGuide('/rapor').menuLabel, 'Cetak Dokumen');
+  assert.equal(resolveTutorialGuide('/pengaturan').menuLabel, 'Pengaturan');
+  assert.equal(resolveTutorialGuide('/tidak-dikenal').menuLabel, 'Beranda');
+  assert.equal(
+    buildPdfFileName(['Rapor', 'Kelas 4 A', '2026/2027']),
+    'Rapor_Kelas_4_A_2026_2027.pdf'
+  );
+  assert.equal(buildPdfFileName(['', null]), 'Dokumen_Sekolah.pdf');
+
+  // Paginasi pintar: baris yang melintasi batas potong harus pindah utuh ke halaman berikutnya
+  const slices = computePageSlices(3600, 2246, 70, [
+    { start: 2100, end: 2260 }, // melintasi rawCut ~2176 -> potong di 2100
+    { start: 3000, end: 3580 }, // blok tanda tangan + footer -> ikut utuh di halaman 2
+  ]);
+  assert.equal(slices.length, 2);
+  assert.equal(slices[0].endY, 2100);
+  assert.equal(slices[1].startY, 2100);
+  assert.equal(slices[1].endY, 3600);
+
+  // Dengan bottomReservePx = 104 (catatan kaki tiap halaman), halaman tunggal > 2142 dipecah bersih
+  const footerSlices = computePageSlices(2200, 2246, 70, [{ start: 1950, end: 2120 }], 104);
+  assert.equal(footerSlices.length, 2);
+  assert.equal(footerSlices[0].endY, 1950);
+  assert.equal(footerSlices[1].startY, 1950);
+  assert.equal(footerSlices[1].endY, 2200);
+});
+
+
 
 
 

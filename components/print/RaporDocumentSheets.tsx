@@ -2,6 +2,12 @@
 
 import React from 'react';
 import type { RankedStudentEntry, TeacherTppSummaryRow } from '@/lib/server/services/print-metrics';
+import {
+  formatIndoDate,
+  formatIndoDateRange,
+  formatIndoEndOfMonthDate,
+  formatIndoMonthYear,
+} from '@/lib/utils';
 
 export interface PrintSchoolInfo {
   name: string;
@@ -18,6 +24,12 @@ export interface PrintSchoolInfo {
   principalName: string;
   principalNip: string;
   logoUrl?: string | null;
+  principalSignaturePath?: string | null;
+  schoolStampPath?: string | null;
+  showPrincipalSignature?: boolean;
+  showSchoolStamp?: boolean;
+  showLetterhead?: boolean;
+  signatureCacheKey?: number;
   enableKeasramaan?: boolean;
 }
 
@@ -185,11 +197,23 @@ function KopSekolah({
   school,
   title,
   subtitle,
+  plainTitleWhenHidden = false,
 }: {
   school: PrintSchoolInfo;
   title: string;
   subtitle?: string;
+  plainTitleWhenHidden?: boolean;
 }) {
+  if (school.showLetterhead === false) {
+    if (!plainTitleWhenHidden) return null;
+    return (
+      <div className="text-center pb-2 mb-1">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-slate-900">{title}</h2>
+        {subtitle && <p className="text-[11px] font-medium text-slate-600 mt-0.5">{subtitle}</p>}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-4 pb-3 border-b-2 border-slate-900">
       <img
@@ -207,6 +231,53 @@ function KopSekolah({
         </p>
         {subtitle && <p className="text-[11px] font-medium text-slate-600 mt-0.5">{subtitle}</p>}
       </div>
+    </div>
+  );
+}
+
+function PrincipalSignatureArea({
+  school,
+  heightClass = 'h-16',
+  align = 'center',
+}: {
+  school: PrintSchoolInfo;
+  heightClass?: 'h-16' | 'h-20';
+  align?: 'center' | 'left';
+}) {
+  const showSig =
+    (school.showPrincipalSignature ?? true) && Boolean(school.principalSignaturePath);
+  const showStamp = (school.showSchoolStamp ?? true) && Boolean(school.schoolStampPath);
+  const sigBust = school.principalSignaturePath
+    ? `&v=${encodeURIComponent(school.principalSignaturePath)}`
+    : '';
+  const stampBust = school.schoolStampPath
+    ? `&v=${encodeURIComponent(school.schoolStampPath)}`
+    : '';
+
+  return (
+    <div
+      className={`relative overflow-visible ${heightClass} flex items-center ${
+        align === 'left' ? 'justify-start pl-6' : 'justify-center'
+      }`}
+    >
+      {showStamp && (
+        <img
+          src={`/api/school/assets?type=stamp${stampBust}`}
+          alt="Stempel Sekolah"
+          referrerPolicy="no-referrer"
+          className={`pointer-events-none select-none absolute top-1/2 -translate-y-1/2 w-28 h-28 print:w-[30mm] print:h-[30mm] object-contain opacity-85 mix-blend-multiply z-10 ${
+            align === 'left' ? '-left-3' : 'left-1/2 -translate-x-[72%]'
+          }`}
+        />
+      )}
+      {showSig && (
+        <img
+          src={`/api/school/assets?type=signature${sigBust}`}
+          alt="Tanda Tangan Kepala Sekolah"
+          referrerPolicy="no-referrer"
+          className="relative z-0 max-h-14 max-w-[160px] object-contain"
+        />
+      )}
     </div>
   );
 }
@@ -354,12 +425,12 @@ export function BiodataMuridSheet({
   const rows: Array<[string, string, string]> = [
     ['1.', 'Nama Lengkap Peserta Didik', student.fullName.toUpperCase()],
     ['2.', 'NIS / NISN', `${student.nis} / ${student.nisn}`],
-    ['3.', 'Tempat, Tanggal Lahir', `${student.birthPlace}, ${student.birthDate}`],
+    ['3.', 'Tempat, Tanggal Lahir', `${student.birthPlace}, ${formatIndoDate(student.birthDate)}`],
     ['4.', 'Jenis Kelamin', student.gender === 'L' ? 'Laki-laki' : 'Perempuan'],
     ['5.', 'Agama', student.religion],
     ['6.', 'Kelas / Fase Saat Ini', `${cls.name} (Fase ${cls.fase})`],
     ['7.', 'Sekolah Asal / Sebelumnya', student.previousSchool || '-'],
-    ['8.', 'Tanggal Diterima di Sekolah Ini', student.enrollmentDate || '-'],
+    ['8.', 'Tanggal Diterima di Sekolah Ini', formatIndoDate(student.enrollmentDate)],
     ['9.', 'Alamat Peserta Didik', formattedAddress],
     ['10.', 'Nomor Telepon / HP', student.phone || student.parentPhone || '-'],
     ['11.', 'Nama Ayah Kandung', student.fatherName || '-'],
@@ -420,10 +491,10 @@ export function BiodataMuridSheet({
 
         <div className="text-center min-w-[220px]">
           <p>
-            {school.regency}, {semester.reportDate}
+            {school.regency}, {formatIndoDate(semester.reportDate)}
           </p>
           <p>Kepala Sekolah,</p>
-          <div className="h-16" />
+          <PrincipalSignatureArea school={school} heightClass="h-16" />
           <p className="font-semibold underline">{school.principalName}</p>
           <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
         </div>
@@ -509,10 +580,10 @@ export function PiagamPrestasiSheet({
           </div>
           <div className="text-center">
             <p>
-              {school.regency}, {semester.reportDate}
+              {school.regency}, {formatIndoDate(semester.reportDate)}
             </p>
             <p>Kepala Sekolah</p>
-            <div className="h-16" />
+            <PrincipalSignatureArea school={school} heightClass="h-16" />
             <p className="font-semibold underline">{school.principalName}</p>
             <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
           </div>
@@ -520,57 +591,6 @@ export function PiagamPrestasiSheet({
       </div>
     </article>
   );
-}
-
-function formatIndoDate(isoDate: string): string {
-  if (!isoDate) return '-';
-  const parts = isoDate.split('-');
-  if (parts.length !== 3) return isoDate;
-  const months = [
-    'Januari',
-    'Februari',
-    'Maret',
-    'April',
-    'Mei',
-    'Juni',
-    'Juli',
-    'Agustus',
-    'September',
-    'Oktober',
-    'November',
-    'Desember',
-  ];
-  const mIdx = Number(parts[1]) - 1;
-  const d = Number(parts[2]);
-  if (!months[mIdx] || !Number.isFinite(d)) return isoDate;
-  return `${d} ${months[mIdx]} ${parts[0]}`;
-}
-
-function formatMonthTitle(yyyyMm: string): string {
-  if (!yyyyMm || !/^\d{4}-\d{2}$/.test(yyyyMm)) return yyyyMm || 'Bulan Aktif';
-  const [y, m] = yyyyMm.split('-');
-  const months = [
-    'Januari',
-    'Februari',
-    'Maret',
-    'April',
-    'Mei',
-    'Juni',
-    'Juli',
-    'Agustus',
-    'September',
-    'Oktober',
-    'November',
-    'Desember',
-  ];
-  return `${months[Number(m) - 1] || m} ${y}`;
-}
-
-function formatEndOfMonthDate(yyyyMm: string): string {
-  if (!yyyyMm || !/^\d{4}-\d{2}$/.test(yyyyMm)) return '';
-  const [y, m] = yyyyMm.split('-');
-  const lastDay = new Date(Number(y), Number(m), 0).getDate();
-  return formatIndoDate(`${y}-${m}-${String(lastDay).padStart(2, '0')}`);
 }
 
 function RaporIdentitasHeader({
@@ -662,6 +682,8 @@ export function RaporAkademikSheet({
 
   return (
     <article
+      data-footer-left={`${cls.name} | ${rep.student.fullName} | ${rep.student.nis}`}
+      data-footer-right={`${school.name} · ${academicYear}`}
       className={`print-portrait bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0 ${
         pageBreak ? 'rapor-page-break' : ''
       }`}
@@ -788,7 +810,7 @@ export function RaporAkademikSheet({
       </table>
 
       {/* Ketidakhadiran & Catatan Wali Kelas Berdampingan */}
-      <div className="grid grid-cols-12 gap-4 mb-4">
+      <div className="rapor-keep-together grid grid-cols-12 gap-4 mb-3">
         <div className="col-span-5">
           <table className="w-full border-collapse border border-black text-xs">
             <thead>
@@ -831,7 +853,7 @@ export function RaporAkademikSheet({
             </thead>
             <tbody>
               <tr>
-                <td className="border border-black p-2.5 text-xs leading-snug align-top min-h-[76px] h-[78px] text-justify">
+                <td className="border border-black p-2.5 text-xs leading-snug align-top min-h-[60px] h-[64px] text-justify">
                   {rep.homeroomNote || '—'}
                 </td>
               </tr>
@@ -841,7 +863,7 @@ export function RaporAkademikSheet({
       </div>
 
       {/* Tanggapan Orang Tua / Wali */}
-      <table className="w-full border-collapse border border-black text-xs mb-6">
+      <table className="rapor-keep-together w-full border-collapse border border-black text-xs mb-4">
         <thead>
           <tr>
             <th className="border border-black py-1.5 px-2.5 text-center font-bold">
@@ -851,46 +873,52 @@ export function RaporAkademikSheet({
         </thead>
         <tbody>
           <tr>
-            <td className="border border-black p-3 h-[72px]" />
+            <td className="border border-black p-2.5 h-[56px]" />
           </tr>
         </tbody>
       </table>
 
-      {/* Tanda Tangan */}
-      <div className="rapor-signature-block pt-2 text-xs space-y-6">
-        <div className="grid grid-cols-2 gap-8">
-          <div className="text-center">
-            <p className="invisible">Tanggal</p>
-            <p className="font-bold">Orang Tua / Wali Murid</p>
-            <div className="h-20" />
-            <p className="font-bold">____________________</p>
+      {/* Tanda Tangan & Footer Identitas Murid (Terikat Utuh) */}
+      <div className="rapor-keep-together pt-1">
+        <div className="rapor-signature-block text-xs space-y-3">
+          <div className="grid grid-cols-2 gap-8">
+            <div className="text-center">
+              <p className="invisible">Tanggal</p>
+              <p className="font-bold">Orang Tua / Wali Murid</p>
+              <div className="h-16" />
+              <p className="font-bold">____________________</p>
+            </div>
+            <div className="text-center">
+              <p>
+                {school.regency}, {formatIndoDate(semester.reportDate)}
+              </p>
+              <p className="font-bold">Wali Kelas</p>
+              <div className="h-16" />
+              <p className="font-bold underline">{cls.homeroomTeacherName || 'Wali Kelas'}</p>
+              <p className="text-[11px]">
+                {cls.homeroomTeacherNip ? `NIP ${cls.homeroomTeacherNip}` : '-'}
+              </p>
+            </div>
           </div>
           <div className="text-center">
-            <p>
-              {school.regency}, {semester.reportDate}
+            <p className="font-bold">Kepala Sekolah</p>
+            <PrincipalSignatureArea school={school} heightClass="h-16" />
+            <p className="font-bold underline">{school.principalName}</p>
+            <p className="text-[11px]">
+              {school.principalNip ? `NIP ${school.principalNip}` : '-'}
             </p>
-            <p className="font-bold">Wali Kelas</p>
-            <div className="h-20" />
-            <p className="font-bold underline">{cls.homeroomTeacherName || 'Wali Kelas'}</p>
-            <p className="text-[11px]">{cls.homeroomTeacherNip || '-'}</p>
           </div>
         </div>
-        <div className="text-center">
-          <p className="font-bold">Kepala Sekolah</p>
-          <div className="h-20" />
-          <p className="font-bold underline">{school.principalName}</p>
-          <p className="text-[11px]">{school.principalNip || '-'}</p>
-        </div>
-      </div>
 
-      {/* Footer Identitas Murid */}
-      <div className="mt-8 pt-2 flex items-center justify-between text-[11px] text-slate-600">
-        <span>
-          {cls.name} | {rep.student.fullName} | {rep.student.nis}
-        </span>
-        <span>
-          {school.name} · {academicYear}
-        </span>
+        {/* Footer Identitas Murid */}
+        <div className="rapor-inline-footer mt-4 pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+          <span>
+            {cls.name} | {rep.student.fullName} | {rep.student.nis}
+          </span>
+          <span>
+            {school.name} · {academicYear}
+          </span>
+        </div>
       </div>
     </article>
   );
@@ -915,6 +943,8 @@ export function RaporKeasramaanSheet({
 
   return (
     <article
+      data-footer-left={`${cls.name} | ${rep.student.fullName} | ${rep.student.nis}`}
+      data-footer-right={`${school.name} · ${academicYear}`}
       className={`print-portrait relative overflow-hidden bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[210mm] p-8 sm:p-10 print:border-0 print:shadow-none print:p-0 ${
         pageBreak ? 'rapor-page-break' : ''
       }`}
@@ -1032,51 +1062,55 @@ export function RaporKeasramaanSheet({
           </tbody>
         </table>
 
-        <div className="rapor-signature-block pt-2 text-xs space-y-10">
-          <div className="grid grid-cols-2 gap-8">
-            <div className="text-center">
-              <p className="invisible">Tanggal</p>
-              <p className="font-bold">Wali Asrama</p>
-              <div className="h-20" />
-              <p className="font-bold underline">
-                {rep.keasramaanSigners?.waliAsramaName || 'Pembina Asrama'}
-              </p>
-              <p className="text-[11px]">-</p>
+        <div className="rapor-keep-together pt-2">
+          <div className="rapor-signature-block text-xs space-y-5">
+            <div className="grid grid-cols-2 gap-8">
+              <div className="text-center">
+                <p className="invisible">Tanggal</p>
+                <p className="font-bold">Wali Asrama</p>
+                <div className="h-16" />
+                <p className="font-bold underline">
+                  {rep.keasramaanSigners?.waliAsramaName || 'Pembina Asrama'}
+                </p>
+                <p className="text-[11px]">-</p>
+              </div>
+              <div className="text-center">
+                <p>
+                  {school.regency}, {formatIndoDate(semester.reportDate)}
+                </p>
+                <p className="font-bold">Wali Asuh</p>
+                <div className="h-16" />
+                <p className="font-bold underline">
+                  {rep.keasramaanSigners?.waliAsuhName || 'Wali Asuh'}
+                </p>
+                <p className="text-[11px]">-</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p>
-                {school.regency}, {semester.reportDate}
-              </p>
-              <p className="font-bold">Wali Asuh</p>
-              <div className="h-20" />
-              <p className="font-bold underline">
-                {rep.keasramaanSigners?.waliAsuhName || 'Wali Asuh'}
-              </p>
-              <p className="text-[11px]">-</p>
+            <div className="grid grid-cols-2 gap-8">
+              <div className="text-center">
+                <p className="font-bold">Orang Tua / Wali Murid</p>
+                <div className="h-16" />
+                <p className="font-bold">____________________</p>
+              </div>
+              <div className="text-center">
+                <p className="font-bold">Kepala Sekolah</p>
+                <PrincipalSignatureArea school={school} heightClass="h-16" />
+                <p className="font-bold underline">{school.principalName}</p>
+                <p className="text-[11px]">
+                  {school.principalNip ? `NIP ${school.principalNip}` : '-'}
+                </p>
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-8">
-            <div className="text-center">
-              <p className="font-bold">Orang Tua / Wali Murid</p>
-              <div className="h-20" />
-              <p className="font-bold">____________________</p>
-            </div>
-            <div className="text-center">
-              <p className="font-bold">Kepala Sekolah</p>
-              <div className="h-20" />
-              <p className="font-bold underline">{school.principalName}</p>
-              <p className="text-[11px]">{school.principalNip || '-'}</p>
-            </div>
-          </div>
-        </div>
 
-        <div className="mt-8 pt-2 flex items-center justify-between text-[11px] text-slate-600">
-          <span>
-            {cls.name} | {rep.student.fullName} | {rep.student.nis}
-          </span>
-          <span>
-            {school.name} · {academicYear}
-          </span>
+          <div className="rapor-inline-footer mt-4 pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+            <span>
+              {cls.name} | {rep.student.fullName} | {rep.student.nis}
+            </span>
+            <span>
+              {school.name} · {academicYear}
+            </span>
+          </div>
         </div>
       </div>
     </article>
@@ -1109,9 +1143,9 @@ export function JurnalMengajarPrintSheet({
     .filter(Boolean)
     .sort();
   const periodDisplay =
-    dates.length > 0 ? `${dates[0]} s.d. ${dates[dates.length - 1]}` : monthLabel;
+    dates.length > 0 ? formatIndoDateRange(dates[0], dates[dates.length - 1]) : monthLabel;
   const lastDateIndo =
-    dates.length > 0 ? formatIndoDate(dates[dates.length - 1]) : semester.reportDate;
+    dates.length > 0 ? formatIndoDate(dates[dates.length - 1]) : formatIndoDate(semester.reportDate);
 
   return (
     <article className="print-landscape bg-white text-black border border-slate-300 shadow-sm mx-auto max-w-[297mm] p-8 print:border-0 print:shadow-none print:p-0 print:max-w-none">
@@ -1191,7 +1225,7 @@ export function JurnalMengajarPrintSheet({
         <div className="text-center">
           <p className="font-bold">Mengetahui</p>
           <p>Kepala Sekolah</p>
-          <div className="h-20" />
+          <PrincipalSignatureArea school={school} heightClass="h-20" />
           <p className="font-bold underline">{school.principalName}</p>
           <p className="text-[11px]">{school.principalNip || '-'}</p>
         </div>
@@ -1234,13 +1268,14 @@ export function BukuTamuPrintSheet({
         school={school}
         title="BUKU TAMU RESMI SEKOLAH"
         subtitle={`${semester.name} · Periode ${monthLabel}`}
+        plainTitleWhenHidden
       />
 
       <table className="rapor-table w-full border-collapse border border-slate-800 text-xs my-5">
         <thead>
           <tr className="bg-slate-100">
             <th className="border border-slate-800 py-2 px-2 text-center w-9">No</th>
-            <th className="border border-slate-800 py-2 px-2 text-left w-24">Tanggal</th>
+            <th className="border border-slate-800 py-2 px-2 text-left w-32">Tanggal</th>
             <th className="border border-slate-800 py-2 px-2 text-left w-36">Nama Tamu</th>
             <th className="border border-slate-800 py-2 px-2 text-left w-36">Instansi / Alamat</th>
             <th className="border border-slate-800 py-2 px-2 text-left">Keperluan</th>
@@ -1260,8 +1295,8 @@ export function BukuTamuPrintSheet({
                 <td className="border border-slate-800 py-2 px-2 text-center font-mono tabular-nums align-top">
                   {idx + 1}
                 </td>
-                <td className="border border-slate-800 py-2 px-2 font-mono tabular-nums align-top">
-                  {g.visitDate}
+                <td className="border border-slate-800 py-2 px-2 tabular-nums align-top whitespace-nowrap">
+                  {formatIndoDate(g.visitDate)}
                 </td>
                 <td className="border border-slate-800 py-2 px-2 align-top">
                   <div className="font-semibold">{g.visitorName}</div>
@@ -1283,10 +1318,10 @@ export function BukuTamuPrintSheet({
       <div className="rapor-signature-block flex justify-end pt-4 text-xs">
         <div className="text-center min-w-[220px]">
           <p>
-            {school.regency}, {semester.reportDate}
+            {school.regency}, {formatIndoDate(semester.reportDate)}
           </p>
           <p>Mengetahui, Kepala Sekolah</p>
-          <div className="h-16" />
+          <PrincipalSignatureArea school={school} heightClass="h-16" />
           <p className="font-semibold underline">{school.principalName}</p>
           <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
         </div>
@@ -1312,8 +1347,8 @@ export function PresensiGuruPrintSheet({
   dailyCalendar: DailyCalendarDay[];
   dailyMatrixRows: TeacherDailyMatrixRow[];
 }) {
-  const monthTitle = formatMonthTitle(resolvedMonth);
-  const endMonthDate = formatEndOfMonthDate(resolvedMonth) || semester.reportDate;
+  const monthTitle = formatIndoMonthYear(resolvedMonth);
+  const endMonthDate = formatIndoEndOfMonthDate(resolvedMonth) || formatIndoDate(semester.reportDate);
 
   const dayBg = (holidayType: DailyCalendarDay['holidayType']) => {
     if (holidayType === 'national') return 'bg-rose-100';
@@ -1519,7 +1554,7 @@ export function PresensiGuruPrintSheet({
           <p>{endMonthDate}</p>
           <p>Kepala</p>
           <p>{school.name}</p>
-          <div className="h-16" />
+          <PrincipalSignatureArea school={school} heightClass="h-16" align="left" />
           <p className="font-bold">{school.principalName}</p>
           <p className="text-[11px]">NIP. {school.principalNip || '-'}</p>
         </div>
@@ -1549,6 +1584,7 @@ export function LaporanTppPrintSheet({
         school={school}
         title="LAPORAN DISIPLIN KERJA & TAMBAHAN PENGHASILAN PEGAWAI (TPP)"
         subtitle={`Tahun Ajaran ${academicYear} · ${semester.name} · Periode ${monthLabel} · Basis Hari Efektif: ${effectiveWorkDays} Hari`}
+        plainTitleWhenHidden
       />
 
       <p className="text-[11px] text-slate-700 my-3 leading-relaxed">
@@ -1617,10 +1653,10 @@ export function LaporanTppPrintSheet({
         </div>
         <div className="text-center">
           <p>
-            {school.regency}, {semester.reportDate}
+            {school.regency}, {formatIndoDate(semester.reportDate)}
           </p>
           <p>Kepala Sekolah</p>
-          <div className="h-16" />
+          <PrincipalSignatureArea school={school} heightClass="h-16" />
           <p className="font-semibold underline">{school.principalName}</p>
           <p className="font-mono text-[11px]">NIP {school.principalNip || '-'}</p>
         </div>

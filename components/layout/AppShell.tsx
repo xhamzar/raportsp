@@ -13,6 +13,7 @@ import {
   ClipboardCheck,
   FileSpreadsheet,
   GraduationCap,
+  HelpCircle,
   Home,
   LogOut,
   Menu,
@@ -30,6 +31,7 @@ import {
   X,
 } from 'lucide-react';
 import { useApp } from '@/components/providers/AppContext';
+import { TutorialGuideModal } from '@/components/layout/TutorialGuideModal';
 import { AccessDeniedCard, TableSkeleton } from '@/components/ui/Primitives';
 import type { ModuleName } from '@/lib/auth/rbac-constants';
 import { cn } from '@/lib/utils';
@@ -166,6 +168,7 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const [notifItems, setNotifItems] = useState<
     Array<{
       id: number;
@@ -404,9 +407,20 @@ export function AppShell({
               type="button"
               onClick={toggleTheme}
               aria-label="Ganti tema tampilan"
+              title="Ganti tema tampilan"
               className="h-9 w-9 flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer shrink-0"
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTutorialOpen(true)}
+              aria-label="Petunjuk penggunaan menu ini"
+              title="Petunjuk menu"
+              className="h-9 w-9 flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer shrink-0"
+            >
+              <HelpCircle className="w-4 h-4" />
             </button>
 
             <div className="relative shrink-0">
@@ -609,6 +623,11 @@ export function AppShell({
           </div>
         ))}
       </div>
+      <TutorialGuideModal
+        open={tutorialOpen}
+        onClose={() => setTutorialOpen(false)}
+        pathname={pathname}
+      />
     </div>
   );
 }

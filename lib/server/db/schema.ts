@@ -174,6 +174,13 @@ export const schools = sqliteTable('schools', {
   principalName: text('principal_name').notNull(),
   principalNip: text('principal_nip').default(''),
   logoUrl: text('logo_url').default('/images/school-crest.jpg'),
+  principalSignaturePath: text('principal_signature_path').default(''),
+  schoolStampPath: text('school_stamp_path').default(''),
+  showPrincipalSignature: integer('show_principal_signature', { mode: 'boolean' })
+    .notNull()
+    .default(true),
+  showSchoolStamp: integer('show_school_stamp', { mode: 'boolean' }).notNull().default(true),
+  showLetterhead: integer('show_letterhead', { mode: 'boolean' }).notNull().default(true),
   enableKeasramaan: integer('enable_keasramaan', { mode: 'boolean' }).notNull().default(false),
   enableAi: integer('enable_ai', { mode: 'boolean' }).notNull().default(true),
   updatedAt: text('updated_at').notNull(),

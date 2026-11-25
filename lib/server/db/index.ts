@@ -131,6 +131,11 @@ function ensureTables(sqlite: Database.Database) {
       principal_name TEXT NOT NULL,
       principal_nip TEXT DEFAULT '',
       logo_url TEXT DEFAULT '/images/school-crest.jpg',
+      principal_signature_path TEXT DEFAULT '',
+      school_stamp_path TEXT DEFAULT '',
+      show_principal_signature INTEGER NOT NULL DEFAULT 1,
+      show_school_stamp INTEGER NOT NULL DEFAULT 1,
+      show_letterhead INTEGER NOT NULL DEFAULT 1,
       enable_keasramaan INTEGER NOT NULL DEFAULT 0,
       enable_ai INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL
@@ -746,6 +751,21 @@ function ensureTables(sqlite: Database.Database) {
   for (const [colName, colDef] of studentMigrations) {
     if (!existingStudentCols.has(colName)) {
       sqlite.exec(`ALTER TABLE students ADD COLUMN ${colName} ${colDef}`);
+    }
+  }
+
+  const schoolCols = sqlite.prepare('PRAGMA table_info(schools)').all() as Array<{ name: string }>;
+  const existingSchoolCols = new Set(schoolCols.map((c) => c.name));
+  const schoolMigrations: Array<[string, string]> = [
+    ['principal_signature_path', "TEXT DEFAULT ''"],
+    ['school_stamp_path', "TEXT DEFAULT ''"],
+    ['show_principal_signature', 'INTEGER NOT NULL DEFAULT 1'],
+    ['show_school_stamp', 'INTEGER NOT NULL DEFAULT 1'],
+    ['show_letterhead', 'INTEGER NOT NULL DEFAULT 1'],
+  ];
+  for (const [colName, colDef] of schoolMigrations) {
+    if (!existingSchoolCols.has(colName)) {
+      sqlite.exec(`ALTER TABLE schools ADD COLUMN ${colName} ${colDef}`);
     }
   }
 }

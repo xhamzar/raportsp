@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
+import { formatIndoDate } from '@/lib/utils';
 import {
   AlertBox,
   Button,
@@ -328,36 +329,35 @@ export default function SiswaPage() {
           ) : (
             <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                    <tr>
-                      <th className="py-3 px-3 font-semibold w-10">No</th>
-                      <th className="py-3 px-3 font-semibold">NISN / NIS</th>
-                      <th className="py-3 px-3 font-semibold">Nama Lengkap</th>
-                      <th className="py-3 px-3 font-semibold">JK</th>
-                      <th className="py-3 px-3 font-semibold">Agama</th>
-                      <th className="py-3 px-3 font-semibold">Tempat, Tgl Lahir</th>
-                      <th className="py-3 px-3 font-semibold">Rombel</th>
-                      <th className="py-3 px-3 font-semibold">Status</th>
-                      <th className="py-3 px-3 font-semibold text-right">Aksi</th>
+                <table className="data-table text-left text-xs">
+                  <thead>
+                    <tr className="text-slate-600 dark:text-slate-300">
+                      <th className="py-3 px-3 font-semibold w-10 col-id">No</th>
+                      <th className="py-3 px-3 font-semibold col-id col-cell-div">NISN / NIS</th>
+                      <th className="py-3 px-3 font-semibold col-id col-cell-div">Nama Lengkap</th>
+                      <th className="py-3 px-3 font-semibold col-a col-sep">JK</th>
+                      <th className="py-3 px-3 font-semibold col-a col-cell-div">Agama</th>
+                      <th className="py-3 px-3 font-semibold col-a col-cell-div">
+                        Tempat, Tgl Lahir
+                      </th>
+                      <th className="py-3 px-3 font-semibold col-b col-sep">Rombel</th>
+                      <th className="py-3 px-3 font-semibold col-total col-sep">Status</th>
+                      <th className="py-3 px-3 font-semibold text-right col-action col-sep">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody>
                     {students.map((s, idx) => (
-                      <tr
-                        key={s.id}
-                        className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                      >
-                        <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">
+                      <tr key={s.id}>
+                        <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500 col-id">
                           {idx + 1}
                         </td>
-                        <td className="py-2.5 px-3 font-mono tabular-nums">
+                        <td className="py-2.5 px-3 font-mono tabular-nums col-id col-cell-div">
                           <div className="font-medium text-slate-900 dark:text-slate-100">
                             {s.nisn}
                           </div>
                           <div className="text-[11px] text-slate-500">NIS {s.nis}</div>
                         </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100">
+                        <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100 col-id col-cell-div">
                           <button
                             type="button"
                             onClick={() => openDetail(s)}
@@ -366,13 +366,13 @@ export default function SiswaPage() {
                             {s.fullName}
                           </button>
                         </td>
-                        <td className="py-2.5 px-3">{s.gender}</td>
-                        <td className="py-2.5 px-3">{s.religion}</td>
-                        <td className="py-2.5 px-3 tabular-nums">
-                          {s.birthPlace}, {s.birthDate}
+                        <td className="py-2.5 px-3 col-a col-sep">{s.gender}</td>
+                        <td className="py-2.5 px-3 col-a col-cell-div">{s.religion}</td>
+                        <td className="py-2.5 px-3 tabular-nums col-a col-cell-div whitespace-nowrap">
+                          {s.birthPlace}, {formatIndoDate(s.birthDate)}
                         </td>
-                        <td className="py-2.5 px-3 font-medium">{s.className}</td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-2.5 px-3 font-medium col-b col-sep">{s.className}</td>
+                        <td className="py-2.5 px-3 col-total col-sep">
                           <span
                             className={
                               s.status === 'Aktif'
@@ -383,7 +383,7 @@ export default function SiswaPage() {
                             {s.status}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-2.5 px-3 text-right col-action col-sep">
                           <div className="inline-flex items-center gap-1">
                             <button
                               type="button"
@@ -470,8 +470,8 @@ export default function SiswaPage() {
                           Murid: {stu?.fullName || `#${a.studentId}`}
                         </p>
                       </div>
-                      <span className="font-mono tabular-nums text-slate-500 shrink-0">
-                        {a.date}
+                      <span className="tabular-nums whitespace-nowrap text-slate-500 shrink-0">
+                        {formatIndoDate(a.date)}
                       </span>
                     </div>
                   );

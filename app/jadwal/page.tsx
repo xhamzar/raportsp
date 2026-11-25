@@ -218,21 +218,26 @@ export default function JadwalPage() {
                 <span className="text-[11px] text-slate-500">Klik sel untuk mengisi atau mengubah</span>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                    <tr>
-                      <th className="py-2.5 px-3 font-semibold w-28">Jam / Waktu</th>
-                      {DAYS.map((d) => (
-                        <th key={d.id} className="py-2.5 px-3 font-semibold min-w-[130px]">
+                <table className="data-table text-left text-xs">
+                  <thead>
+                    <tr className="text-slate-600 dark:text-slate-300">
+                      <th className="py-2.5 px-3 font-semibold w-28 col-id">Jam / Waktu</th>
+                      {DAYS.map((d, dayIdx) => (
+                        <th
+                          key={d.id}
+                          className={`py-2.5 px-3 font-semibold min-w-[130px] col-sep ${
+                            dayIdx % 2 === 0 ? 'col-a' : 'col-b'
+                          }`}
+                        >
                           {d.label}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody>
                     {bells.map((bell) => (
                       <tr key={bell.id} className={bell.isBreak ? 'bg-amber-50/40 dark:bg-amber-950/10' : ''}>
-                        <td className="py-2.5 px-3 align-top">
+                        <td className="py-2.5 px-3 align-top col-id">
                           <div className="font-semibold text-slate-800 dark:text-slate-200">
                             {bell.label}
                           </div>
@@ -240,12 +245,13 @@ export default function JadwalPage() {
                             {bell.startTime}–{bell.endTime}
                           </div>
                         </td>
-                        {DAYS.map((day) => {
+                        {DAYS.map((day, dayIdx) => {
+                          const dayColClass = `${dayIdx % 2 === 0 ? 'col-a' : 'col-b'} col-sep`;
                           if (bell.isBreak) {
                             return (
                               <td
                                 key={day.id}
-                                className="py-2.5 px-3 text-[11px] text-amber-700 dark:text-amber-300 font-medium"
+                                className={`py-2.5 px-3 text-[11px] text-amber-700 dark:text-amber-300 font-medium ${dayColClass}`}
                               >
                                 Istirahat
                               </td>
@@ -257,9 +263,9 @@ export default function JadwalPage() {
                           const sub = subjects.find((s) => s.id === slot?.subjectId);
                           const tchr = teachers.find((t) => t.id === slot?.teacherId);
                           return (
-                            <td key={day.id} className="py-2 px-2.5 align-top">
+                            <td key={day.id} className={`py-2 px-2.5 align-top ${dayColClass}`}>
                               {slot ? (
-                                <div className="group p-2 rounded border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/50 hover:border-[#1D4ED8] transition-colors">
+                                <div className="group p-2 rounded border border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/60 hover:border-[#1D4ED8] transition-colors">
                                   <div className="flex items-start justify-between gap-1">
                                     {canManageSchedule ? (
                                       <button

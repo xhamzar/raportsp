@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button, Input, Select } from '@/components/ui/Primitives';
 import type { ClassOption } from '@/components/providers/AppContext';
+import { formatIndoDate } from '@/lib/utils';
 
 export interface TeacherOption {
   id: number;
@@ -728,10 +729,11 @@ function StudentDetailEditModalBody({
                     label="Tempat, Tanggal Lahir"
                     value={
                       form.birthPlace || form.birthDate
-                        ? `${form.birthPlace || '-'}, ${form.birthDate || '-'}`
+                        ? `${form.birthPlace || '-'}, ${
+                            form.birthDate ? formatIndoDate(form.birthDate) : '-'
+                          }`
                         : '-'
                     }
-                    mono
                   />
                   <DetailField
                     label="Anak Ke- / Jumlah Saudara"
@@ -744,7 +746,7 @@ function StudentDetailEditModalBody({
                   <DetailField label="Rombel" value={`Kelas ${selectedClassName}`} />
                   <DetailField label="Status Murid" value={form.status} />
                   <DetailField label="Sekolah Asal" value={form.previousSchool} />
-                  <DetailField label="Tanggal Diterima" value={form.enrollmentDate} mono />
+                  <DetailField label="Tanggal Diterima" value={formatIndoDate(form.enrollmentDate)} />
                   <DetailField label="No. HP Murid" value={form.phone} mono />
                   <DetailField label="Email Murid" value={form.email} />
                 </div>

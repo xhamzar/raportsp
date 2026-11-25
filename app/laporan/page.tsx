@@ -190,32 +190,55 @@ function LaporanInner() {
             ) : (
               <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                      <tr>
-                        <th className="py-3 px-3 font-semibold w-12">Pkt</th>
-                        <th className="py-3 px-3 font-semibold">Nama Murid</th>
-                        {subjects.map((sub) => (
+                  <table className="data-table text-left text-xs">
+                    <thead>
+                      <tr className="th-groups text-[10px] uppercase tracking-wider">
+                        <th colSpan={2} className="py-1.5 px-3 font-semibold col-id">
+                          Identitas
+                        </th>
+                        {subjects.length > 0 && (
+                          <th
+                            colSpan={subjects.length}
+                            className="py-1.5 px-2 font-semibold text-center col-a col-sep"
+                          >
+                            Nilai Akhir Mata Pelajaran
+                          </th>
+                        )}
+                        <th className="py-1.5 px-3 font-semibold text-right col-total col-sep">
+                          Total
+                        </th>
+                        <th colSpan={2} className="py-1.5 px-3 font-semibold text-center col-c col-sep">
+                          Pengembangan Diri
+                        </th>
+                      </tr>
+                      <tr className="text-slate-600 dark:text-slate-300">
+                        <th className="py-2.5 px-3 font-semibold w-12 col-id">Pkt</th>
+                        <th className="py-2.5 px-3 font-semibold col-id col-cell-div">Nama Murid</th>
+                        {subjects.map((sub, subIdx) => (
                           <th
                             key={sub.id}
                             title={sub.name}
-                            className="py-3 px-2 font-semibold text-right whitespace-nowrap"
+                            className={`py-2.5 px-2 font-semibold text-right whitespace-nowrap ${
+                              subIdx % 2 === 0 ? 'col-a' : 'col-b'
+                            } ${subIdx === 0 ? 'col-sep' : 'col-cell-div'}`}
                           >
                             {sub.code.split('-')[0]}
                           </th>
                         ))}
-                        <th className="py-3 px-3 font-semibold text-right">Rata-rata</th>
-                        <th className="py-3 px-3 font-semibold">Kokurikuler</th>
-                        <th className="py-3 px-3 font-semibold">Ekstra</th>
+                        <th className="py-2.5 px-3 font-semibold text-right col-total col-sep">
+                          Rata-rata
+                        </th>
+                        <th className="py-2.5 px-3 font-semibold col-c col-sep">Kokurikuler</th>
+                        <th className="py-2.5 px-3 font-semibold col-c col-cell-div">Ekstra</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    <tbody>
                       {leger.map((row) => (
-                        <tr key={row.studentId} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                          <td className="py-2.5 px-3 font-mono tabular-nums font-semibold text-slate-500">
+                        <tr key={row.studentId}>
+                          <td className="py-2.5 px-3 font-mono tabular-nums font-semibold text-slate-500 col-id">
                             #{row.rank}
                           </td>
-                          <td className="py-2.5 px-3">
+                          <td className="py-2.5 px-3 col-id col-cell-div">
                             <div className="font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
                               {row.fullName}
                             </div>
@@ -223,22 +246,28 @@ function LaporanInner() {
                               {row.nisn}
                             </div>
                           </td>
-                          {subjects.map((sub) => {
+                          {subjects.map((sub, subIdx) => {
                             const val = row.subjectScores[sub.id];
                             return (
                               <td
                                 key={sub.id}
-                                className="py-2.5 px-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-200"
+                                className={`py-2.5 px-2 text-right font-mono tabular-nums text-slate-700 dark:text-slate-200 ${
+                                  subIdx % 2 === 0 ? 'col-a' : 'col-b'
+                                } ${subIdx === 0 ? 'col-sep' : 'col-cell-div'}`}
                               >
                                 {val !== null && val !== undefined ? Math.round(val) : '-'}
                               </td>
                             );
                           })}
-                          <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-[#0F2942] dark:text-blue-400">
+                          <td className="py-2.5 px-3 text-right font-mono tabular-nums font-bold text-slate-900 dark:text-slate-100 col-total col-sep">
                             {row.average.toFixed(1)}
                           </td>
-                          <td className="py-2.5 px-3 whitespace-nowrap">{row.cocurricularSummary}</td>
-                          <td className="py-2.5 px-3 whitespace-nowrap">{row.extracurricularSummary}</td>
+                          <td className="py-2.5 px-3 whitespace-nowrap col-c col-sep">
+                            {row.cocurricularSummary}
+                          </td>
+                          <td className="py-2.5 px-3 whitespace-nowrap col-c col-cell-div">
+                            {row.extracurricularSummary}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -257,24 +286,32 @@ function LaporanInner() {
         ) : (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold w-10">No</th>
-                    <th className="py-3 px-3 font-semibold">Nama Murid</th>
-                    {keasIndicators.map((ind) => (
-                      <th key={ind.id} className="py-3 px-2 font-semibold text-center whitespace-nowrap" title={ind.category}>
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-3 px-3 font-semibold w-10 col-id">No</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">Nama Murid</th>
+                    {keasIndicators.map((ind, indIdx) => (
+                      <th
+                        key={ind.id}
+                        className={`py-3 px-2 font-semibold text-center whitespace-nowrap ${
+                          indIdx % 2 === 0 ? 'col-a' : 'col-b'
+                        } ${indIdx === 0 ? 'col-sep' : 'col-cell-div'}`}
+                        title={ind.category}
+                      >
                         {ind.name}
                       </th>
                     ))}
-                    <th className="py-3 px-3 font-semibold">Wali Asuh</th>
+                    <th className="py-3 px-3 font-semibold col-total col-sep">Wali Asuh</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {keasRows.map((row, idx) => (
-                    <tr key={row.studentId} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">{idx + 1}</td>
-                      <td className="py-2.5 px-3">
+                    <tr key={row.studentId}>
+                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500 col-id">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2.5 px-3 col-id col-cell-div">
                         <div className="font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
                           {row.fullName}
                         </div>
@@ -282,15 +319,20 @@ function LaporanInner() {
                           {row.nisn}
                         </div>
                       </td>
-                      {keasIndicators.map((ind) => {
+                      {keasIndicators.map((ind, indIdx) => {
                         const match = row.items.find((it) => it.indicatorId === ind.id);
                         return (
-                          <td key={ind.id} className="py-2.5 px-2 text-center font-mono font-bold">
+                          <td
+                            key={ind.id}
+                            className={`py-2.5 px-2 text-center font-mono font-bold ${
+                              indIdx % 2 === 0 ? 'col-a' : 'col-b'
+                            } ${indIdx === 0 ? 'col-sep' : 'col-cell-div'}`}
+                          >
                             {match?.predicate || '-'}
                           </td>
                         );
                       })}
-                      <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      <td className="py-2.5 px-3 text-slate-700 dark:text-slate-200 whitespace-nowrap col-total col-sep">
                         {row.waliAsuhName || '-'}
                       </td>
                     </tr>

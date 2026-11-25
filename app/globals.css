@@ -35,6 +35,189 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Standardized Data Table Column-Group & Zebra System */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table thead th {
+  background-color: rgba(248, 250, 252, 0.95);
+  color: #475569;
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.dark .data-table thead th {
+  background-color: rgba(15, 23, 42, 0.85);
+  color: #cbd5e1;
+}
+
+.data-table thead tr.th-groups th {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.dark .data-table thead tr.th-groups th {
+  border-bottom: 1px solid rgba(51, 65, 85, 0.75);
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+  transition: background-color 120ms ease;
+}
+
+.dark .data-table tbody tr {
+  border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+}
+
+.data-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background-color: rgba(15, 23, 42, 0.024);
+}
+
+.dark .data-table tbody tr:nth-child(even) {
+  background-color: rgba(255, 255, 255, 0.022);
+}
+
+.data-table tbody tr:hover {
+  background-color: rgba(29, 78, 216, 0.052);
+}
+
+.dark .data-table tbody tr:hover {
+  background-color: rgba(96, 165, 250, 0.085);
+}
+
+.data-table tbody tr:focus-within {
+  background-color: rgba(29, 78, 216, 0.085);
+}
+
+.dark .data-table tbody tr:focus-within {
+  background-color: rgba(96, 165, 250, 0.14);
+}
+
+.data-table tbody tr:focus-within td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent-blue);
+}
+
+/* Column Group Tints */
+.data-table thead th.col-id {
+  background-color: rgba(248, 250, 252, 0.96);
+  color: #334155;
+}
+
+.dark .data-table thead th.col-id {
+  background-color: rgba(15, 23, 42, 0.85);
+  color: #e2e8f0;
+}
+
+.data-table thead th.col-a {
+  background-color: rgba(219, 234, 254, 0.62);
+  color: #1e3a5f;
+}
+
+.dark .data-table thead th.col-a {
+  background-color: rgba(30, 58, 95, 0.52);
+  color: #dbeafe;
+}
+
+.data-table tbody td.col-a {
+  background-color: rgba(59, 130, 246, 0.036);
+}
+
+.dark .data-table tbody td.col-a {
+  background-color: rgba(59, 130, 246, 0.058);
+}
+
+.data-table thead th.col-b {
+  background-color: rgba(226, 232, 240, 0.72);
+  color: #334155;
+}
+
+.dark .data-table thead th.col-b {
+  background-color: rgba(51, 65, 85, 0.52);
+  color: #e2e8f0;
+}
+
+.data-table tbody td.col-b {
+  background-color: rgba(100, 116, 139, 0.045);
+}
+
+.dark .data-table tbody td.col-b {
+  background-color: rgba(148, 163, 184, 0.06);
+}
+
+.data-table thead th.col-c {
+  background-color: rgba(224, 231, 255, 0.6);
+  color: #312e81;
+}
+
+.dark .data-table thead th.col-c {
+  background-color: rgba(49, 46, 129, 0.36);
+  color: #e0e7ff;
+}
+
+.data-table tbody td.col-c {
+  background-color: rgba(99, 102, 241, 0.032);
+}
+
+.dark .data-table tbody td.col-c {
+  background-color: rgba(99, 102, 241, 0.052);
+}
+
+/* Neutral Header & Total / Summary Columns */
+.data-table thead th.col-total {
+  background-color: rgba(15, 41, 66, 0.1);
+  color: #0f2942;
+}
+
+.dark .data-table thead th.col-total {
+  background-color: rgba(30, 41, 59, 0.92);
+  color: #f1f5f9;
+}
+
+.data-table tbody td.col-total {
+  background-color: rgba(15, 41, 66, 0.048);
+}
+
+.dark .data-table tbody td.col-total {
+  background-color: rgba(30, 58, 95, 0.3);
+}
+
+.data-table thead th.col-action {
+  background-color: rgba(241, 245, 249, 0.92);
+}
+
+.dark .data-table thead th.col-action {
+  background-color: rgba(15, 23, 42, 0.85);
+}
+
+.data-table tbody td.col-action {
+  background-color: rgba(248, 250, 252, 0.45);
+}
+
+.dark .data-table tbody td.col-action {
+  background-color: rgba(15, 23, 42, 0.28);
+}
+
+/* Vertical Separators */
+.data-table .col-sep {
+  border-left: 1px solid rgba(148, 163, 184, 0.36);
+}
+
+.dark .data-table .col-sep {
+  border-left: 1px solid rgba(51, 65, 85, 0.78);
+}
+
+.data-table .col-cell-div {
+  border-left: 1px solid rgba(226, 232, 240, 0.65);
+}
+
+.dark .data-table .col-cell-div {
+  border-left: 1px solid rgba(30, 41, 59, 0.65);
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -106,7 +289,8 @@
     break-before: avoid;
   }
 
-  .rapor-signature-block {
+  .rapor-signature-block,
+  .rapor-keep-together {
     page-break-inside: avoid;
     break-inside: avoid;
   }

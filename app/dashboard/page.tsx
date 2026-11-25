@@ -15,6 +15,7 @@ import {
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
 import { Button, TableSkeleton } from '@/components/ui/Primitives';
+import { formatIndoDate } from '@/lib/utils';
 
 interface DashboardData {
   school: {
@@ -121,7 +122,7 @@ export default function DashboardPage() {
                   <span>Semester {data.activeSemester?.name}</span>
                   <span aria-hidden="true">·</span>
                   <span className="tabular-nums">
-                    Bagi Rapor {data.activeSemester?.reportDate}
+                    Bagi Rapor {formatIndoDate(data.activeSemester?.reportDate)}
                   </span>
                 </div>
               </div>
@@ -366,8 +367,8 @@ export default function DashboardPage() {
                           Oleh {act.actorName}
                         </p>
                       </div>
-                      <span className="text-[11px] font-mono tabular-nums text-slate-400 shrink-0">
-                        {act.createdAt.slice(0, 10)}
+                      <span className="text-[11px] tabular-nums text-slate-400 shrink-0 whitespace-nowrap">
+                        {formatIndoDate(act.createdAt)}
                       </span>
                     </div>
                   ))}

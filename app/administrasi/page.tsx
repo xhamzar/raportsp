@@ -6,6 +6,7 @@ import { Check, Plus } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
 import { Button, Input, Modal, Select, TabBar, TableSkeleton } from '@/components/ui/Primitives';
+import { formatIndoDate, formatIndoDateRange } from '@/lib/utils';
 
 interface GuestRow {
   id: number;
@@ -199,31 +200,37 @@ function AdministrasiInner() {
         ) : tab === 'tamu' ? (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold w-28">Tanggal</th>
-                    <th className="py-3 px-3 font-semibold">Nama Tamu & Instansi</th>
-                    <th className="py-3 px-3 font-semibold">Menemui</th>
-                    <th className="py-3 px-3 font-semibold">Keperluan</th>
-                    <th className="py-3 px-3 font-semibold">Kontak</th>
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-3 px-3 font-semibold w-36 col-id">Tanggal</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">
+                      Nama Tamu & Instansi
+                    </th>
+                    <th className="py-3 px-3 font-semibold col-a col-sep">Menemui</th>
+                    <th className="py-3 px-3 font-semibold col-a col-cell-div">Keperluan</th>
+                    <th className="py-3 px-3 font-semibold col-b col-sep">Kontak</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {guests.map((g) => (
                     <tr key={g.id}>
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">
-                        {g.visitDate}
+                      <td className="py-2.5 px-3 tabular-nums whitespace-nowrap text-slate-600 dark:text-slate-300 col-id">
+                        {formatIndoDate(g.visitDate)}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-id col-cell-div">
                         <div className="font-medium text-slate-900 dark:text-slate-100">
                           {g.visitorName}
                         </div>
                         <div className="text-[11px] text-slate-500">{g.institution}</div>
                       </td>
-                      <td className="py-2.5 px-3">{g.personToMeet}</td>
-                      <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300">{g.purpose}</td>
-                      <td className="py-2.5 px-3 font-mono tabular-nums">{g.phone || '-'}</td>
+                      <td className="py-2.5 px-3 col-a col-sep">{g.personToMeet}</td>
+                      <td className="py-2.5 px-3 text-slate-700 dark:text-slate-300 col-a col-cell-div">
+                        {g.purpose}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono tabular-nums col-b col-sep">
+                        {g.phone || '-'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -233,34 +240,40 @@ function AdministrasiInner() {
         ) : (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold">Pendidik</th>
-                    <th className="py-3 px-3 font-semibold">Tujuan & Surat Tugas</th>
-                    <th className="py-3 px-3 font-semibold">Tanggal</th>
-                    <th className="py-3 px-3 font-semibold">Status</th>
-                    {canApproveAdmin && <th className="py-3 px-3 font-semibold text-right">Aksi</th>}
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-3 px-3 font-semibold col-id">Pendidik</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">
+                      Tujuan & Surat Tugas
+                    </th>
+                    <th className="py-3 px-3 font-semibold col-a col-sep">Tanggal</th>
+                    <th className="py-3 px-3 font-semibold col-total col-sep">Status</th>
+                    {canApproveAdmin && (
+                      <th className="py-3 px-3 font-semibold text-right col-action col-sep">
+                        Aksi
+                      </th>
+                    )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {travels.map((tr) => (
                     <tr key={tr.id}>
-                      <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100">
+                      <td className="py-2.5 px-3 font-medium text-slate-900 dark:text-slate-100 col-id">
                         {tr.teacherName}
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-id col-cell-div">
                         <div className="font-medium">{tr.destination}</div>
                         <div className="text-[11px] text-slate-500">
                           {tr.purpose} · No. {tr.letterNumber || '-'}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3 font-mono tabular-nums">
-                        {tr.startDate} s.d. {tr.endDate}
+                      <td className="py-2.5 px-3 tabular-nums whitespace-nowrap col-a col-sep">
+                        {formatIndoDateRange(tr.startDate, tr.endDate)}
                       </td>
-                      <td className="py-2.5 px-3 font-semibold">{tr.status}</td>
+                      <td className="py-2.5 px-3 font-semibold col-total col-sep">{tr.status}</td>
                       {canApproveAdmin && (
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-2.5 px-3 text-right col-action col-sep">
                           {tr.status === 'Diajukan' && (
                             <Button
                               size="sm"

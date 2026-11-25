@@ -6,6 +6,7 @@ import { CheckCircle2, Download, Save } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
 import { AlertBox, Button, Input, TabBar, TableSkeleton } from '@/components/ui/Primitives';
+import { formatIndoDate, formatIndoDateRange } from '@/lib/utils';
 
 interface StudentAttRow {
   no: number;
@@ -113,7 +114,7 @@ function AbsensiInner() {
     });
     setSaving(false);
     if (res.ok) {
-      notify('success', `Presensi murid Kelas ${selectedClass.name} tanggal ${date} disimpan.`);
+      notify('success', `Presensi murid Kelas ${selectedClass.name} tanggal ${formatIndoDate(date)} disimpan.`);
       await loadData();
     } else {
       const json = await res.json().catch(() => ({}));
@@ -138,7 +139,7 @@ function AbsensiInner() {
     });
     setSaving(false);
     if (res.ok) {
-      notify('success', `Presensi pendidik tanggal ${date} disimpan.`);
+      notify('success', `Presensi pendidik tanggal ${formatIndoDate(date)} disimpan.`);
       await loadData();
     } else {
       notify('error', 'Gagal menyimpan presensi pendidik.');
@@ -213,7 +214,7 @@ function AbsensiInner() {
 
         {tab === 'murid' && holiday && (
           <AlertBox variant="warning" title={`Hari Libur Kalender Pendidikan: ${holiday.title}`}>
-            Tanggal {date} bertepatan dengan agenda libur sekolah ({holiday.startDate} s.d. {holiday.endDate}).
+            Tanggal {formatIndoDate(date)} bertepatan dengan agenda libur sekolah ({formatIndoDateRange(holiday.startDate, holiday.endDate)}).
           </AlertBox>
         )}
 
@@ -222,22 +223,30 @@ function AbsensiInner() {
         ) : tab === 'murid' ? (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold w-10">No</th>
-                    <th className="py-3 px-3 font-semibold">Nama Murid</th>
-                    <th className="py-3 px-3 font-semibold">Status Tanggal {date}</th>
-                    <th className="py-3 px-3 font-semibold">Keterangan</th>
-                    <th className="py-3 px-3 font-semibold text-right">Rekap Semester (H/S/I/A)</th>
-                    <th className="py-3 px-3 font-semibold text-right">Kehadiran</th>
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-3 px-3 font-semibold w-10 col-id">No</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">Nama Murid</th>
+                    <th className="py-3 px-3 font-semibold col-a col-sep whitespace-nowrap">
+                      Status Tanggal {formatIndoDate(date)}
+                    </th>
+                    <th className="py-3 px-3 font-semibold col-b col-sep">Keterangan</th>
+                    <th className="py-3 px-3 font-semibold text-right col-total col-sep">
+                      Rekap Semester (H/S/I/A)
+                    </th>
+                    <th className="py-3 px-3 font-semibold text-right col-total col-cell-div">
+                      Kehadiran
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {studentRows.map((row) => (
-                    <tr key={row.studentId} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500">{row.no}</td>
-                      <td className="py-2.5 px-3">
+                    <tr key={row.studentId}>
+                      <td className="py-2.5 px-3 font-mono tabular-nums text-slate-500 col-id">
+                        {row.no}
+                      </td>
+                      <td className="py-2.5 px-3 col-id col-cell-div">
                         <div className="font-medium text-slate-900 dark:text-slate-100">
                           {row.fullName}
                         </div>
@@ -245,7 +254,7 @@ function AbsensiInner() {
                           {row.nisn}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-a col-sep">
                         <div className="inline-flex items-center gap-1">
                           {(['H', 'S', 'I', 'A'] as const).map((code) => {
                             const active = row.status === code;
@@ -265,11 +274,7 @@ function AbsensiInner() {
                                   canCreateAttendance ? 'cursor-pointer' : 'cursor-not-allowed opacity-80'
                                 } ${
                                   active
-                                    ? code === 'H'
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
-                                      : code === 'A'
-                                      ? 'bg-red-600 text-white border-red-600'
-                                      : 'bg-[#0F2942] text-white border-[#0F2942]'
+                                    ? 'bg-[#0F2942] dark:bg-blue-600 text-white border-[#0F2942] dark:border-blue-500'
                                     : 'bg-white dark:bg-[#0F172A] text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700'
                                 }`}
                               >
@@ -279,7 +284,7 @@ function AbsensiInner() {
                           })}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-b col-sep">
                         <input
                           type="text"
                           value={row.notes}
@@ -296,10 +301,10 @@ function AbsensiInner() {
                           className="w-full min-w-[140px] h-8 px-2.5 text-xs bg-white dark:bg-[#0F172A] border border-slate-300 dark:border-slate-700 rounded disabled:opacity-70"
                         />
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-700 dark:text-slate-200 col-total col-sep">
                         {row.hadir} / {row.sakit} / {row.izin} / {row.alpa}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 col-total col-cell-div">
                         {row.percentage}%
                       </td>
                     </tr>
@@ -311,20 +316,22 @@ function AbsensiInner() {
         ) : (
           <div className="bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
-                  <tr>
-                    <th className="py-3 px-3 font-semibold">Nama Pendidik</th>
-                    <th className="py-3 px-3 font-semibold">Bidang</th>
-                    <th className="py-3 px-3 font-semibold">Status Kehadiran</th>
-                    <th className="py-3 px-3 font-semibold w-28">Jam Hadir</th>
-                    <th className="py-3 px-3 font-semibold text-right">Rekap H/S/I/DL</th>
+              <table className="data-table text-left text-xs">
+                <thead>
+                  <tr className="text-slate-600 dark:text-slate-300">
+                    <th className="py-3 px-3 font-semibold col-id">Nama Pendidik</th>
+                    <th className="py-3 px-3 font-semibold col-id col-cell-div">Bidang</th>
+                    <th className="py-3 px-3 font-semibold col-a col-sep">Status Kehadiran</th>
+                    <th className="py-3 px-3 font-semibold w-28 col-b col-sep">Jam Hadir</th>
+                    <th className="py-3 px-3 font-semibold text-right col-total col-sep">
+                      Rekap H/S/I/DL
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {teacherRows.map((t) => (
                     <tr key={t.teacherId}>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-id">
                         <div className="font-medium text-slate-900 dark:text-slate-100">
                           {t.fullName}
                         </div>
@@ -332,8 +339,8 @@ function AbsensiInner() {
                           {t.nip || '-'}
                         </div>
                       </td>
-                      <td className="py-2.5 px-3">{t.specialization}</td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-id col-cell-div">{t.specialization}</td>
+                      <td className="py-2.5 px-3 col-a col-sep">
                         <select
                           value={t.status}
                           disabled={!canCreateAttendance}
@@ -354,7 +361,7 @@ function AbsensiInner() {
                           <option value="Alpa">Alpa</option>
                         </select>
                       </td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-2.5 px-3 col-b col-sep">
                         <input
                           type="time"
                           disabled={!canCreateAttendance}
@@ -370,7 +377,7 @@ function AbsensiInner() {
                           className="h-8 px-2 text-xs font-mono bg-white dark:bg-[#0F172A] border border-slate-300 dark:border-slate-700 rounded disabled:opacity-70"
                         />
                       </td>
-                      <td className="py-2.5 px-3 text-right font-mono tabular-nums">
+                      <td className="py-2.5 px-3 text-right font-mono tabular-nums font-medium text-slate-800 dark:text-slate-100 col-total col-sep">
                         {t.recap.hadir} / {t.recap.sakit} / {t.recap.izin} / {t.recap.dinasLuar}
                       </td>
                     </tr>

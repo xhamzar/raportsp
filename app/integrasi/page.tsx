@@ -5,6 +5,7 @@ import { CheckCircle2, PlugZap, RefreshCw, Send, Upload, Download } from 'lucide
 import { AppShell } from '@/components/layout/AppShell';
 import { useApp } from '@/components/providers/AppContext';
 import { AlertBox, Button, Input, Select, TabBar, TableSkeleton } from '@/components/ui/Primitives';
+import { formatIndoDate, formatIndoDateTime } from '@/lib/utils';
 
 interface DapodikSyncLog {
   id: number;
@@ -325,7 +326,7 @@ export default function IntegrasiPage() {
                 <AlertBox variant={dapodikForm.mode === 'Sandbox' ? 'warning' : 'info'}>
                   Status saat ini: <strong>{connStatus || 'Belum diuji'}</strong>
                   {lastSyncAt &&
-                    ` · Sinkronisasi terakhir: ${lastSyncAt.slice(0, 16).replace('T', ' ')}`}
+                    ` · Sinkronisasi terakhir: ${formatIndoDateTime(lastSyncAt)}`}
                 </AlertBox>
 
                 <Input
@@ -525,8 +526,8 @@ export default function IntegrasiPage() {
                           </span>
                         </div>
                         <p className="text-slate-600 dark:text-slate-300">{l.responseMessage}</p>
-                        <p className="text-[11px] font-mono text-slate-400">
-                          {l.createdAt.slice(0, 16)}
+                        <p className="text-[11px] tabular-nums text-slate-400">
+                          {formatIndoDateTime(l.createdAt)}
                         </p>
                       </div>
                     ))
@@ -556,8 +557,8 @@ export default function IntegrasiPage() {
                           Diproses: {l.recordsProcessed} · Pemetaan baru: {l.recordsCreated} ·
                           Diperbarui: {l.recordsUpdated}
                         </p>
-                        <p className="text-[11px] font-mono text-slate-400">
-                          {l.createdAt.slice(0, 16)}
+                        <p className="text-[11px] tabular-nums text-slate-400">
+                          {formatIndoDateTime(l.createdAt)}
                         </p>
                       </div>
                     ))
@@ -674,20 +675,26 @@ export default function IntegrasiPage() {
                       </AlertBox>
                     )}
                     <div className="max-h-64 overflow-y-auto border border-slate-200 dark:border-slate-800 rounded">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                      <table className="data-table text-left text-xs">
+                        <thead>
                           <tr>
-                            <th className="py-2 px-3">NISN</th>
-                            <th className="py-2 px-3">Nama Murid</th>
-                            <th className="py-2 px-3 text-right">Nilai</th>
+                            <th className="py-2 px-3 font-semibold col-id">NISN</th>
+                            <th className="py-2 px-3 font-semibold col-id col-cell-div">
+                              Nama Murid
+                            </th>
+                            <th className="py-2 px-3 font-semibold text-right col-total col-sep">
+                              Nilai
+                            </th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        <tbody>
                           {eraporPreview.rows.map((r) => (
                             <tr key={r.rowNumber}>
-                              <td className="py-2 px-3 font-mono">{r.nisn}</td>
-                              <td className="py-2 px-3 font-medium">{r.fullName}</td>
-                              <td className="py-2 px-3 text-right font-mono font-bold">
+                              <td className="py-2 px-3 font-mono col-id">{r.nisn}</td>
+                              <td className="py-2 px-3 font-medium col-id col-cell-div">
+                                {r.fullName}
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono tabular-nums font-bold col-total col-sep">
                                 {r.score}
                               </td>
                             </tr>
@@ -705,8 +712,8 @@ export default function IntegrasiPage() {
                         <div key={l.id} className="py-2.5 text-xs">
                           <div className="flex items-center justify-between font-medium">
                             <span>{l.fileName}</span>
-                            <span className="font-mono text-slate-500">
-                              {l.createdAt.slice(0, 10)}
+                            <span className="tabular-nums whitespace-nowrap text-slate-500">
+                              {formatIndoDate(l.createdAt)}
                             </span>
                           </div>
                           <p className="text-slate-500 mt-0.5 tabular-nums">
