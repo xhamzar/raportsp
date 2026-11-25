@@ -86,8 +86,17 @@ import {
 } from '../lib/server/services/school-assets';
 import { resolveTutorialGuide } from '../lib/tutorial-guides';
 import { buildPdfFileName, computePageSlices } from '../lib/pdf-renderer';
+import {
+  decryptApiKey,
+  encryptApiKey,
+  maskApiKey,
+  resolveProviderEndpoint,
+  validateAiBaseUrl,
+} from '../lib/server/services/ai-keys';
+import { resolveEffectiveAiCredentialsForUser } from '../lib/server/services/ai-assistant';
 import { getDb, resetDbConnection } from '../lib/server/db';
 import {
+  aiConfigs,
   classes,
   classStudents,
   dapodikSubjects,
@@ -923,6 +932,161 @@ test('Penyimpanan aman tanda tangan & stempel sekolah serta resolusi panduan tut
   assert.equal(footerSlices[1].startY, 1950);
   assert.equal(footerSlices[1].endY, 2200);
 });
+
+test('Enkripsi Kunci API AI, validasi SSRF Base URL, endpoint provider, dan cakupan sekolah/pribadi', async () => {
+  // 1. Enkripsi AES-256-GCM & masking
+  const sampleKey = 'demo-provider-token-12345678';
+  const encrypted = encryptApiKey(sampleKey);
+  assert.ok(encrypted.startsWith('v1:'));
+  assert.equal(encrypted.includes(sampleKey), false);
+  assert.equal(decryptApiKey(encrypted), sampleKey);
+  assert.equal(decryptApiKey(`${encrypted}00`), null);
+  assert.equal(maskApiKey(sampleKey), 'demo••••5678');
+
+  // 2. Validasi SSRF Base URL
+  assert.deepEqual(validateAiBaseUrl(''), { valid: true, normalized: '' });
+  assert.deepEqual(validateAiBaseUrl('https://generativelanguage.googleapis.com/'), {
+    valid: true,
+    normalized: 'https://generativelanguage.googleapis.com',
+  });
+  assert.equal(validateAiBaseUrl('http://generativelanguage.googleapis.com').valid, false);
+  assert.equal(validateAiBaseUrl('https://localhost:8443/v1').valid, false);
+  assert.equal(validateAiBaseUrl('https://127.0.0.1/v1').valid, false);
+  assert.equal(validateAiBaseUrl('https://169.254.169.254/latest').valid, false);
+  assert.equal(validateAiBaseUrl('https://192.168.1.10/v1').valid, false);
+  assert.equal(validateAiBaseUrl('https://openrouter.ai/api/v1?key=abc').valid, false);
+
+  // 3. Resolusi endpoint Gemini native vs OpenAI-compatible
+  const geminiDefault = resolveProviderEndpoint({ model: 'gemini-2.5-flash', baseUrl: '' });
+  assert.equal(geminiDefault.mode, 'gemini-native');
+  assert.equal(
+    geminiDefault.endpointUrl,
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
+  );
+
+  const openRouter = resolveProviderEndpoint({
+    model: 'google/gemini-2.5-flash',
+    baseUrl: 'https://openrouter.ai/api/v1/',
+  });
+  assert.equal(openRouter.mode, 'openai-compat');
+  assert.equal(openRouter.endpointUrl, 'https://openrouter.ai/api/v1/chat/completions');
+
+  const deepSeekRoot = resolveProviderEndpoint({
+    model: 'deepseek-chat',
+    baseUrl: 'https://api.deepseek.com',
+  });
+  assert.equal(deepSeekRoot.mode, 'openai-compat');
+  assert.equal(deepSeekRoot.endpointUrl, 'https://api.deepseek.com/v1/chat/completions');
+
+  const geminiOpenAiCompat = resolveProviderEndpoint({
+    model: 'gemini-2.5-flash',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+  });
+  assert.equal(geminiOpenAiCompat.mode, 'openai-compat');
+  assert.equal(
+    geminiOpenAiCompat.endpointUrl,
+    'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+  );
+
+  // 4. Isolasi kunci sekolah (Admin/Kepsek) vs kunci pribadi (Guru)
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sekolahkita-aikeys-'));
+  const prevPath = process.env.DATABASE_PATH;
+  process.env.DATABASE_PATH = path.join(tmpDir, 'aikeys.db');
+  resetDbConnection();
+  resetSeedFlag();
+
+  try {
+    await ensureSeeded();
+    const db = getDb();
+    const allUsers = await db.select().from(users);
+    const adminUser = allUsers[0];
+    const guruUser = allUsers[1] || allUsers[0];
+
+    const now = new Date().toISOString();
+    await db.insert(aiConfigs).values({
+      ownerKey: 'school',
+      scope: 'school',
+      userId: null,
+      apiKeyEnc: encryptApiKey('school-key-9999'),
+      model: 'gemini-2.5-flash',
+      baseUrl: '',
+      updatedAt: now,
+    });
+
+    const adminAuth: AuthenticatedUser = {
+      id: adminUser.id,
+      username: adminUser.username,
+      fullName: adminUser.fullName,
+      email: adminUser.email,
+      roleId: adminUser.roleId,
+      roleCode: 'ADMIN_SEKOLAH',
+      roleName: 'Admin Sekolah',
+      isSystemRole: true,
+      teacherId: null,
+      isActive: true,
+      scopeMode: 'ALL',
+      hasFullScope: true,
+      permissions: ['ai:read', 'ai:create', 'sekolah:update'],
+      assignedClassIds: [],
+      assignedSubjectIds: [],
+      homeroomClassIds: [],
+    };
+
+    const guruAuth: AuthenticatedUser = {
+      id: guruUser.id + 50,
+      username: 'guru.test',
+      fullName: 'Guru Test',
+      email: 'guru@example.com',
+      roleId: guruUser.roleId,
+      roleCode: 'GURU',
+      roleName: 'Guru Mapel',
+      isSystemRole: true,
+      teacherId: null,
+      isActive: true,
+      scopeMode: 'ASSIGNED',
+      hasFullScope: false,
+      permissions: ['ai:read', 'ai:create'],
+      assignedClassIds: [],
+      assignedSubjectIds: [],
+      homeroomClassIds: [],
+    };
+
+    // Admin mewarisi kunci sekolah jika belum mengisi kunci pribadi
+    const resolvedAdmin = await resolveEffectiveAiCredentialsForUser(adminAuth);
+    assert.equal(resolvedAdmin?.source, 'school');
+    assert.equal(resolvedAdmin?.apiKey, 'school-key-9999');
+
+    // Guru tidak mewarisi kunci sekolah (wajib isi kunci pribadi)
+    const resolvedGuruEmpty = await resolveEffectiveAiCredentialsForUser(guruAuth);
+    assert.equal(resolvedGuruEmpty, null);
+
+    // Setelah guru (via user valid di DB) mengisi kunci pribadi, kunci pribadi dipakai
+    await db.insert(aiConfigs).values({
+      ownerKey: `user:${guruUser.id}`,
+      scope: 'user',
+      userId: guruUser.id,
+      apiKeyEnc: encryptApiKey('guru-personal-7777'),
+      model: 'deepseek-chat',
+      baseUrl: 'https://api.deepseek.com',
+      updatedAt: now,
+    });
+
+    const resolvedGuruSaved = await resolveEffectiveAiCredentialsForUser({
+      ...guruAuth,
+      id: guruUser.id,
+    });
+    assert.equal(resolvedGuruSaved?.source, 'personal');
+    assert.equal(resolvedGuruSaved?.apiKey, 'guru-personal-7777');
+    assert.equal(resolvedGuruSaved?.model, 'deepseek-chat');
+  } finally {
+    resetDbConnection();
+    resetSeedFlag();
+    if (prevPath === undefined) delete process.env.DATABASE_PATH;
+    else process.env.DATABASE_PATH = prevPath;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 
 
 

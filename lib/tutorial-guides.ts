@@ -295,7 +295,9 @@ export const TUTORIAL_GUIDES: Record<string, TutorialGuideEntry> = {
       [
         { type: 'text', value: 'Gunakan tab ' },
         { type: 'chip', value: 'Akun Saya' },
-        { type: 'text', value: ' untuk mengganti kata sandi, tab ' },
+        { type: 'text', value: ' untuk mengganti kata sandi dan mengatur Kunci API pribadi, tab ' },
+        { type: 'chip', value: 'Kunci API' },
+        { type: 'text', value: ' untuk mengelola Kunci API sekolah (Admin/Kepsek) beserta panduan pengisiannya, tab ' },
         { type: 'chip', value: 'Pengguna' },
         { type: 'text', value: ' & ' },
         { type: 'chip', value: 'Peran & Izin' },

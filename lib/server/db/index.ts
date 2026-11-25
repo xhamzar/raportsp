@@ -662,6 +662,17 @@ function ensureTables(sqlite: Database.Database) {
       subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE
     );
     CREATE UNIQUE INDEX IF NOT EXISTS user_subject_scope_idx ON user_subject_scopes(user_id, subject_id);
+
+    CREATE TABLE IF NOT EXISTS ai_configs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      owner_key TEXT NOT NULL UNIQUE,
+      scope TEXT NOT NULL,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      api_key_enc TEXT NOT NULL DEFAULT '',
+      model TEXT NOT NULL DEFAULT 'gemini-2.5-flash',
+      base_url TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
   `);
 
   // Backward-compatible column migrations for existing databases

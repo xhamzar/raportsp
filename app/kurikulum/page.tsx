@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { BookOpen, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
@@ -145,13 +146,19 @@ function KurikulumInner() {
   });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiDraftText, setAiDraftText] = useState('');
+  const [aiKeyStatus, setAiKeyStatus] = useState<{
+    checked: boolean;
+    apiConfigured: boolean;
+    canUseSchoolKey: boolean;
+  }>({ checked: false, apiConfigured: false, canUseSchoolKey: false });
 
   const loadData = useCallback(async () => {
     setLoading(true);
     const query = selectedClassId ? `&classId=${selectedClassId}` : '';
-    const [acadRes, teachRes] = await Promise.all([
+    const [acadRes, teachRes, aiRes] = await Promise.all([
       fetch(`/api/academics?module=kurikulum${query}`, { cache: 'no-store' }),
       fetch('/api/teachers', { cache: 'no-store' }),
+      fetch('/api/ai', { cache: 'no-store' }).catch(() => null),
     ]);
 
     if (acadRes.ok) {
@@ -168,6 +175,16 @@ function KurikulumInner() {
     if (teachRes.ok) {
       const tJson = await teachRes.json();
       setTeachers(tJson.teachers || []);
+    }
+    if (aiRes && aiRes.ok) {
+      const aJson = await aiRes.json().catch(() => ({}));
+      setAiKeyStatus({
+        checked: true,
+        apiConfigured: Boolean(aJson.apiConfigured),
+        canUseSchoolKey: Boolean(aJson.canUseSchoolKey),
+      });
+    } else {
+      setAiKeyStatus((prev) => ({ ...prev, checked: true }));
     }
     setLoading(false);
   }, [selectedClassId]);
@@ -646,6 +663,7 @@ function KurikulumInner() {
                     size="sm"
                     variant="outline"
                     loading={aiLoading}
+                    disabled={aiKeyStatus.checked && !aiKeyStatus.apiConfigured}
                     onClick={() => handleGenerateAiDraft('rpm')}
                   >
                     <Sparkles className="w-3.5 h-3.5 text-[#1D4ED8]" />
@@ -653,6 +671,25 @@ function KurikulumInner() {
                   </Button>
                 )}
               </div>
+
+              {school?.enableAi &&
+                can('ai', 'create') &&
+                aiKeyStatus.checked &&
+                !aiKeyStatus.apiConfigured && (
+                  <AlertBox variant="warning">
+                    Belum ada kunci API. Fitur &quot;Generate&quot; belum dapat digunakan.{' '}
+                    <Link
+                      href={
+                        aiKeyStatus.canUseSchoolKey
+                          ? '/pengaturan?tab=kunci-api'
+                          : '/pengaturan?tab=akun'
+                      }
+                      className="font-semibold underline hover:no-underline"
+                    >
+                      Atur Kunci API di Pengaturan
+                    </Link>
+                  </AlertBox>
+                )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Select
@@ -966,14 +1003,33 @@ function KurikulumInner() {
                 <button
                   type="button"
                   onClick={() => handleGenerateAiDraft('tp')}
-                  disabled={aiLoading}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[#1D4ED8] hover:underline cursor-pointer"
+                  disabled={aiLoading || (aiKeyStatus.checked && !aiKeyStatus.apiConfigured)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-[#1D4ED8] hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Sparkles className="w-3 h-3" />
                   {aiLoading ? 'Menyusun...' : 'Susun dengan AI'}
                 </button>
               )}
             </div>
+            {school?.enableAi &&
+              can('ai', 'create') &&
+              aiKeyStatus.checked &&
+              !aiKeyStatus.apiConfigured && (
+                <p className="mb-1.5 text-[11px] text-amber-700 dark:text-amber-300">
+                  Belum ada kunci API. Fitur &quot;Generate&quot; belum dapat digunakan —{' '}
+                  <Link
+                    href={
+                      aiKeyStatus.canUseSchoolKey
+                        ? '/pengaturan?tab=kunci-api'
+                        : '/pengaturan?tab=akun'
+                    }
+                    className="font-semibold underline"
+                  >
+                    Isi Kunci API
+                  </Link>
+                  .
+                </p>
+              )}
             <textarea
               rows={3}
               value={tpForm.description}

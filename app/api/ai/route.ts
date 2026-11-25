@@ -4,8 +4,9 @@ import { ensureSeeded } from '@/lib/server/db/seed';
 import { getDb } from '@/lib/server/db';
 import { schools } from '@/lib/server/db/schema';
 import {
+  canUseSchoolAiKey,
   generateEducationalDraft,
-  isGeminiConfigured,
+  resolveEffectiveAiCredentialsForUser,
 } from '@/lib/server/services/ai-assistant';
 import { logAudit, requireApiAuth } from '@/lib/server/auth/session';
 
@@ -16,10 +17,14 @@ export async function GET(req: NextRequest) {
 
   const db = getDb();
   const [school] = await db.select().from(schools).limit(1);
+  const credentials = await resolveEffectiveAiCredentialsForUser(auth.user);
 
   return NextResponse.json({
     enabledInSchool: school?.enableAi ?? true,
-    apiConfigured: isGeminiConfigured(),
+    apiConfigured: Boolean(credentials),
+    activeSource: credentials?.source ?? null,
+    activeModel: credentials?.model ?? null,
+    canUseSchoolKey: canUseSchoolAiKey(auth.user),
   });
 }
 
@@ -57,14 +62,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const credentials = await resolveEffectiveAiCredentialsForUser(auth.user);
+  if (!credentials) {
+    const canUseSchool = canUseSchoolAiKey(auth.user);
+    return NextResponse.json(
+      {
+        error: canUseSchool
+          ? 'Belum ada Kunci API. Fitur "Generate" belum dapat digunakan sebelum Kunci API diisi di Pengaturan → Kunci API atau Akun Saya.'
+          : 'Belum ada Kunci API pribadi. Silakan isi Kunci API pribadi Anda di Pengaturan → Akun Saya atau tab Kunci API.',
+      },
+      { status: 400 }
+    );
+  }
+
   try {
-    const result = await generateEducationalDraft(parsed.data);
+    const result = await generateEducationalDraft({
+      ...parsed.data,
+      credentials,
+    });
     await logAudit({
       userId: auth.user.id,
       actorName: auth.user.fullName,
       action: 'GENERATE_AI_DRAFT',
       entityType: 'ai_assistant',
-      details: `Membuat draf ${parsed.data.taskType} untuk ${parsed.data.subjectName} kelas ${parsed.data.gradeLevel}.`,
+      details: `Membuat draf ${parsed.data.taskType} untuk ${parsed.data.subjectName} kelas ${parsed.data.gradeLevel} (${result.source} · ${result.model}).`,
     });
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {

@@ -20,9 +20,12 @@ export function generateSessionToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+export function getServerSecret(): string {
+  return process.env.SESSION_SECRET || getRuntimeFallbackSecret();
+}
+
 export function hashSessionToken(token: string): string {
-  const secret = process.env.SESSION_SECRET || getRuntimeFallbackSecret();
-  return crypto.createHmac('sha256', secret).update(token).digest('hex');
+  return crypto.createHmac('sha256', getServerSecret()).update(token).digest('hex');
 }
 
 const globalForSecret = globalThis as unknown as { __runtimeSessionSecret?: string };

@@ -903,3 +903,15 @@ export const backups = sqliteTable('backups', {
   }),
   createdAt: text('created_at').notNull(),
 });
+
+export const aiConfigs = sqliteTable('ai_configs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ownerKey: text('owner_key').notNull().unique(), // 'school' | 'user:<id>'
+  scope: text('scope').notNull(), // 'school' | 'user'
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  apiKeyEnc: text('api_key_enc').notNull().default(''),
+  model: text('model').notNull().default('gemini-2.5-flash'),
+  baseUrl: text('base_url').notNull().default(''),
+  updatedAt: text('updated_at').notNull(),
+});
+

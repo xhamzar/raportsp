@@ -45,6 +45,11 @@ import {
   type ScopeMode,
 } from '@/lib/auth/rbac-constants';
 import { formatIndoDateTime } from '@/lib/utils';
+import {
+  AiKeyConfigCard,
+  type AiConfigPayload,
+  type AiKeyConfigSummary,
+} from '@/components/settings/AiKeyConfigCard';
 
 interface UserRow {
   id: number;
@@ -103,12 +108,21 @@ interface BackupRow {
   createdAt: string;
 }
 
-type SettingsTab = 'akun' | 'dokumen' | 'pengguna' | 'peran' | 'backup';
+type SettingsTab = 'akun' | 'kunci-api' | 'dokumen' | 'pengguna' | 'peran' | 'backup';
+
+const EMPTY_AI_KEY_SUMMARY: AiKeyConfigSummary = {
+  hasApiKey: false,
+  maskedKey: '',
+  model: 'gemini-2.5-flash',
+  baseUrl: '',
+  updatedAt: null,
+};
 
 export default function PengaturanPage() {
   const { user, school, classes: contextClasses, can, notify, refreshContext } = useApp();
   const [tab, setTab] = useState<SettingsTab>('akun');
   const [loading, setLoading] = useState(false);
+  const [aiConfig, setAiConfig] = useState<AiConfigPayload | null>(null);
 
   const canReadSchool = can('sekolah', 'read');
   const canUpdateSchool = can('sekolah', 'update');
@@ -193,7 +207,14 @@ export default function PengaturanPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const t = new URLSearchParams(window.location.search).get('tab');
-    if (t === 'dokumen' || t === 'pengguna' || t === 'peran' || t === 'backup' || t === 'akun') {
+    if (
+      t === 'dokumen' ||
+      t === 'pengguna' ||
+      t === 'peran' ||
+      t === 'backup' ||
+      t === 'akun' ||
+      t === 'kunci-api'
+    ) {
       Promise.resolve().then(() => setTab(t));
     }
   }, []);
@@ -272,15 +293,29 @@ export default function PengaturanPage() {
     }
   }, []);
 
+  const loadAiConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/ai/config', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        setAiConfig(json as AiConfigPayload);
+      }
+    } catch {
+      // Ignore transient network errors on settings load
+    }
+  }, []);
+
   useEffect(() => {
     Promise.resolve().then(() => {
-      if (activeTab === 'pengguna' || activeTab === 'peran') {
+      if (activeTab === 'akun' || activeTab === 'kunci-api') {
+        void loadAiConfig();
+      } else if (activeTab === 'pengguna' || activeTab === 'peran') {
         void loadUsersAndRoles();
       } else if (activeTab === 'backup') {
         void loadBackups();
       }
     });
-  }, [activeTab, loadUsersAndRoles, loadBackups]);
+  }, [activeTab, loadAiConfig, loadUsersAndRoles, loadBackups]);
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.id === selectedRoleId) || roles[0] || null,
@@ -928,6 +963,7 @@ export default function PengaturanPage() {
 
   const tabs: Array<{ id: SettingsTab; label: string }> = [
     { id: 'akun', label: 'Akun Saya' },
+    { id: 'kunci-api', label: 'Kunci API' },
     ...(canReadSchool || canUpdateSchool
       ? [{ id: 'dokumen' as const, label: 'Dokumen & TTD' }]
       : []),
@@ -952,7 +988,7 @@ export default function PengaturanPage() {
             Pengaturan Akun & Sistem
           </h1>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Kelola profil akun, pengguna, peran dan hak akses, serta cadangan database lokal.
+            Kelola profil akun, Kunci API manual, pengguna, peran dan hak akses, serta cadangan database lokal.
           </p>
         </div>
 
@@ -963,8 +999,9 @@ export default function PengaturanPage() {
         />
 
         {activeTab === 'akun' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            <div className="lg:col-span-5 bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-3 h-fit">
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              <div className="lg:col-span-5 bg-white dark:bg-[#111C2E] border border-slate-200 dark:border-slate-800 rounded-lg p-5 space-y-3 h-fit">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-[#0F2942] dark:text-blue-400" />
                 Informasi Akun & Hak Akses Aktif
@@ -1044,6 +1081,48 @@ export default function PengaturanPage() {
                 <Button type="submit">Simpan Kata Sandi Baru</Button>
               </div>
             </form>
+            </div>
+
+            <AiKeyConfigCard
+              scope="personal"
+              config={aiConfig?.personal || EMPTY_AI_KEY_SUMMARY}
+              onUpdated={setAiConfig}
+              notify={notify}
+            />
+          </div>
+        ) : activeTab === 'kunci-api' ? (
+          <div className="space-y-5">
+            {(canReadSchool || canUpdateSchool) && aiConfig?.school ? (
+              <>
+                <AiKeyConfigCard
+                  scope="school"
+                  config={aiConfig.school}
+                  readOnly={!canUpdateSchool}
+                  onUpdated={setAiConfig}
+                  notify={notify}
+                />
+                <AiKeyConfigCard
+                  scope="personal"
+                  config={aiConfig.personal || EMPTY_AI_KEY_SUMMARY}
+                  onUpdated={setAiConfig}
+                  notify={notify}
+                />
+              </>
+            ) : (
+              <>
+                <AlertBox variant="info" title="Pembagian Kunci API Sekolah & Guru">
+                  Kunci API tingkat sekolah dikelola oleh Admin atau Kepala Sekolah untuk akun
+                  pimpinan. Sebagai Guru atau staf, masukkan Kunci API pribadi Anda di bawah ini
+                  (tersinkron otomatis dengan tab <strong>Akun Saya</strong>).
+                </AlertBox>
+                <AiKeyConfigCard
+                  scope="personal"
+                  config={aiConfig?.personal || EMPTY_AI_KEY_SUMMARY}
+                  onUpdated={setAiConfig}
+                  notify={notify}
+                />
+              </>
+            )}
           </div>
         ) : activeTab === 'dokumen' ? (
           <div className="space-y-5">
