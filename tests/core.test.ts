@@ -42,18 +42,30 @@ import {
 } from '../lib/utils';
 import {
   assessmentWeightSchema,
+  cocurricularProjectSchema,
   dapodikConfigSchema,
+  extracurricularSchema,
+  formativeBatchSchema,
   keasramaanIndicatorSchema,
   keasramaanScoreUpdateSchema,
+  learningObjectiveSchema,
   roleCreateSchema,
   studentCreateSchema,
   studentUpdateSchema,
+  subjectCreateSchema,
+  summativeScoreUpdateSchema,
 } from '../lib/validators';
 import {
   buildCompetencyDescription,
   buildCompetencyParts,
   calculateSummativeScores,
 } from '../lib/server/services/assessment-engine';
+import {
+  buildCocurricularDescription,
+  buildExtracurricularDescription,
+  computeAverageTwo,
+  computeScopeAveragesFromTpScores,
+} from '../lib/assessment-helpers';
 import {
   extractJsonBody,
   normalizeWebServiceUrl,
@@ -64,6 +76,8 @@ import {
   validateDapodikUrl,
 } from '../lib/server/services/dapodik-adapter';
 import {
+  generateCocurricularTemplateWorkbook,
+  generateExtracurricularTemplateWorkbook,
   generateStudentTemplateWorkbook,
   parseStudentImportExcel,
 } from '../lib/server/services/excel-service';
@@ -99,13 +113,19 @@ import {
   aiConfigs,
   classes,
   classStudents,
+  cocurricularProjects,
+  cocurricularScores,
   dapodikSubjects,
+  extracurriculars,
+  extracurricularScores,
   keasramaanIndicators,
   rolePermissions,
   roles,
   schools,
+  semesters,
   students,
   subjects,
+  summativeScores,
   userClassScopes,
   users,
   userSubjectScopes,
@@ -904,8 +924,15 @@ test('Penyimpanan aman tanda tangan & stempel sekolah serta resolusi panduan tut
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 
-  assert.equal(resolveTutorialGuide('/kurikulum').menuLabel, 'Kurikulum & RPM');
+  assert.equal(resolveTutorialGuide('/kurikulum').menuLabel, 'Intrakurikuler & RPM');
   assert.ok(resolveTutorialGuide('/kurikulum').warning);
+  assert.equal(resolveTutorialGuide('/intrakurikuler').menuLabel, 'Mata Pelajaran Intrakurikuler');
+  assert.equal(resolveTutorialGuide('/kokurikuler').menuLabel, 'Kokurikuler (8 DPL)');
+  assert.equal(resolveTutorialGuide('/ekstrakurikuler').menuLabel, 'Ekstrakurikuler');
+  assert.equal(resolveTutorialGuide('/keasramaan').menuLabel, 'Mata Evaluasi Keasramaan');
+  assert.equal(resolveTutorialGuide('/penilaian').menuLabel, 'Input Nilai');
+  assert.equal(resolveTutorialGuide('/penilaian/formatif').menuLabel, 'Asesmen Formatif');
+  assert.equal(resolveTutorialGuide('/penilaian/sumatif').menuLabel, 'Asesmen Sumatif');
   assert.equal(resolveTutorialGuide('/rapor').menuLabel, 'Cetak Dokumen');
   assert.equal(resolveTutorialGuide('/pengaturan').menuLabel, 'Pengaturan');
   assert.equal(resolveTutorialGuide('/tidak-dikenal').menuLabel, 'Beranda');
@@ -1086,6 +1113,335 @@ test('Enkripsi Kunci API AI, validasi SSRF Base URL, endpoint provider, dan caku
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 });
+
+test('Skema Mata Pelajaran praktis (Intrakurikuler, Kokurikuler 8 DPL, Ekstrakurikuler, Keasramaan) & persistensi DB', async () => {
+  // 1. Intrakurikuler: kode/singkatan opsional, JP default 2
+  const mapelTanpaKode = subjectCreateSchema.safeParse({
+    name: 'Ilmu Pengetahuan Alam dan Sosial',
+    category: 'Wajib',
+    gradeLevel: 7,
+    kkm: 75,
+  });
+  assert.equal(mapelTanpaKode.success, true);
+  if (mapelTanpaKode.success) {
+    assert.equal(mapelTanpaKode.data.code, '');
+    assert.equal(mapelTanpaKode.data.weeklyHours, 2);
+  }
+
+  // 2. Tujuan Pembelajaran (TP): kode & lingkup materi opsional
+  const tpPraktis = learningObjectiveSchema.safeParse({
+    subjectId: 1,
+    semesterId: 1,
+    description: 'Peserta didik mampu menjelaskan perubahan wujud zat.',
+  });
+  assert.equal(tpPraktis.success, true);
+  if (tpPraktis.success) {
+    assert.equal(tpPraktis.data.code, '');
+    assert.equal(tpPraktis.data.scopeMaterial, 'Umum');
+  }
+
+  // 3. Kokurikuler: minimal 1 dari 8 DPL wajib dipilih
+  const invalidKokurikuler = cocurricularProjectSchema.safeParse({
+    classId: 1,
+    semesterId: 1,
+    code: 'K1-1',
+    title: 'Proyek Pengelolaan Sampah',
+    dimensions: [],
+  });
+  assert.equal(invalidKokurikuler.success, false);
+
+  const validKokurikuler = cocurricularProjectSchema.safeParse({
+    classId: 1,
+    semesterId: 1,
+    code: 'K1-1',
+    title: 'Merancang kegiatan pengelolaan sampah di lingkungan sekolah.',
+    dimensions: ['Penalaran Kritis', 'Kolaborasi', 'Kreativitas', 'Kesehatan'],
+  });
+  assert.equal(validKokurikuler.success, true);
+
+  // 4. Ekstrakurikuler & TP
+  const validEkskul = extracurricularSchema.safeParse({
+    name: 'Pramuka',
+    learningObjectives: ['Disiplin baris-berbaris', 'Kerja sama regu'],
+  });
+  assert.equal(validEkskul.success, true);
+
+  // 5. Indikator Keasramaan: mendukung kategori fleksibel & daftar TP
+  const validKeasramaan = keasramaanIndicatorSchema.safeParse({
+    category: 'Kemandirian',
+    name: 'Pembiasaan kemandirian dalam kegiatan sehari-hari.',
+    sortOrder: 1,
+    learningObjectives: ['Merapikan tempat tidur sebelum subuh', 'Menyiapkan perlengkapan belajar mandiri'],
+  });
+  assert.equal(validKeasramaan.success, true);
+
+  // 6. Verifikasi migrasi kolom learning_objectives_json & persistensi di SQLite
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sekolahkita-mapel-'));
+  const prevPath = process.env.DATABASE_PATH;
+  process.env.DATABASE_PATH = path.join(tmpDir, 'mapel.db');
+  resetDbConnection();
+  resetSeedFlag();
+
+  try {
+    await ensureSeeded();
+    const db = getDb();
+
+    const [insertedSub] = await db
+      .insert(subjects)
+      .values({
+        code: '',
+        name: 'Seni Tari Nusantara',
+        category: 'Pilihan',
+        gradeLevel: 7,
+        fase: 'D',
+        kkm: 78,
+        weeklyHours: 2,
+        sortOrder: 99,
+      })
+      .returning();
+    assert.equal(insertedSub.code, '');
+    assert.equal(insertedSub.sortOrder, 99);
+
+    const [insertedInd] = await db
+      .insert(keasramaanIndicators)
+      .values({
+        category: 'Kemandirian',
+        name: 'Pembiasaan kerapian kamar asrama',
+        sortOrder: 10,
+        isActive: true,
+        learningObjectivesJson: JSON.stringify(['Melipat selimut setiap pagi']),
+      })
+      .returning();
+    assert.deepEqual(JSON.parse(insertedInd.learningObjectivesJson), ['Melipat selimut setiap pagi']);
+
+    const activeClasses = await db.select().from(classes).limit(1);
+    const activeSemRows = await db.select().from(cocurricularProjects).limit(1);
+    const activeEkskulRows = await db.select().from(extracurriculars).limit(1);
+    assert.ok(activeClasses.length > 0);
+    assert.ok(activeSemRows.length > 0);
+    assert.ok(activeEkskulRows.length > 0);
+  } finally {
+    resetDbConnection();
+    resetSeedFlag();
+    if (prevPath === undefined) delete process.env.DATABASE_PATH;
+    else process.env.DATABASE_PATH = prevPath;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
+test('Input Nilai praktis: kalkulasi TP/STS/SAS, deskripsi DPL & Ekskul, validasi batch, migrasi kolom DB, dan template Excel', async () => {
+  // 1. Rata-rata Tes & Non-Tes
+  assert.equal(computeAverageTwo(80, 90), 85);
+  assert.equal(computeAverageTwo(84, null), 84);
+  assert.equal(computeAverageTwo(null, null), null);
+
+  // 2. Rata-rata Lingkup Materi per TP (mendukung > 4 lingkup materi)
+  const scopeCalc = computeScopeAveragesFromTpScores(
+    [
+      { id: 1, scopeMaterial: 'Bilangan' },
+      { id: 2, scopeMaterial: 'Aljabar' },
+      { id: 3, scopeMaterial: 'Aljabar' },
+      { id: 4, scopeMaterial: 'Geometri' },
+      { id: 5, scopeMaterial: 'Pengukuran' },
+      { id: 6, scopeMaterial: 'Statistika' },
+    ],
+    { '1': 80, '2': 70, '3': 90, '4': 85, '5': 75, '6': 95 }
+  );
+  assert.equal(scopeCalc.scopes.length, 5);
+  assert.equal(scopeCalc.lm1, 80);
+  assert.equal(scopeCalc.lm2, 80);
+  assert.equal(scopeCalc.lm3, 85);
+  assert.equal(scopeCalc.lm4, 75);
+  // (80 + 80 + 85 + 75 + 95) / 5 = 83
+  assert.equal(scopeCalc.lmAverage, 83);
+
+  const calc = calculateSummativeScores(
+    {
+      lm1: scopeCalc.lm1,
+      lm2: scopeCalc.lm2,
+      lm3: scopeCalc.lm3,
+      lm4: scopeCalc.lm4,
+      lmAverageOverride: scopeCalc.lmAverage,
+      sts: computeAverageTwo(80, 86),
+      sas: computeAverageTwo(88, 92),
+    },
+    { weightLm: 40, weightSts: 30, weightSas: 30, kktpMin: 75 }
+  );
+  // 83*0.4 + 83*0.3 + 90*0.3 = 33.2 + 24.9 + 27 = 85.1
+  assert.equal(calc.lmAverage, 83);
+  assert.equal(calc.finalScore, 85.1);
+
+  // 3. Deskripsi otomatis Kokurikuler & Ekstrakurikuler
+  const cocuDesc = buildCocurricularDescription(
+    ['Kolaborasi', 'Kreativitas'],
+    { Kolaborasi: 'Sangat Baik', Kreativitas: 'Baik' }
+  );
+  assert.equal(cocuDesc.predicate, 'Sangat Baik');
+  assert.ok(cocuDesc.description.includes('Sangat baik dalam kolaborasi'));
+  assert.ok(cocuDesc.description.includes('baik dalam kreativitas'));
+
+  const eksDesc = buildExtracurricularDescription([
+    { objective: 'Berpartisipasi aktif dalam kegiatan Pramuka.', predicate: 'Baik' },
+    { objective: 'Bekerja sama dalam regu.', predicate: 'Sangat Baik' },
+  ]);
+  assert.equal(eksDesc.predicate, 'Sangat Baik');
+  assert.ok(eksDesc.description.startsWith('Ananda '));
+
+  // 4. Validasi Zod formatif batch & sumatif detail TP/Tes/Non-Tes
+  assert.equal(
+    formativeBatchSchema.safeParse({
+      studentId: 1,
+      subjectId: 2,
+      classId: 3,
+      semesterId: 1,
+      entries: [
+        { learningObjectiveId: 10, status: 'Tercapai' },
+        { learningObjectiveId: 11, status: 'Belum Dinilai' },
+      ],
+    }).success,
+    true
+  );
+  assert.equal(
+    summativeScoreUpdateSchema.safeParse({
+      studentId: 1,
+      subjectId: 2,
+      classId: 3,
+      semesterId: 1,
+      stsTes: 80,
+      stsNonTes: 85,
+      sasTes: 90,
+      sasNonTes: null,
+      tpScores: { '10': 88, '11': null },
+    }).success,
+    true
+  );
+
+  // 5. Template Excel Kokurikuler & Ekstrakurikuler
+  const cocuBuf = await generateCocurricularTemplateWorkbook({
+    className: '7 A',
+    projectTitle: 'Pengelolaan Sampah',
+    dimensions: ['Kolaborasi', 'Kreativitas'],
+    students: [
+      {
+        nisn: '0165001001',
+        fullName: 'Aditya Pranata',
+        dimensionScores: { Kolaborasi: 'Baik', Kreativitas: 'Sangat Baik' },
+      },
+    ],
+  });
+  assert.ok(cocuBuf.byteLength > 1000);
+
+  const eksBuf = await generateExtracurricularTemplateWorkbook({
+    className: '7 A',
+    extracurricularName: 'Pramuka',
+    objectives: ['Disiplin latihan', 'Kerja sama regu'],
+    students: [
+      {
+        nisn: '0165001001',
+        fullName: 'Aditya Pranata',
+        tpScores: [{ objective: 'Disiplin latihan', predicate: 'Baik' }],
+        predicate: 'Baik',
+      },
+    ],
+  });
+  assert.ok(eksBuf.byteLength > 1000);
+
+  // 6. Verifikasi kolom migrasi SQLite baru
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sekolahkita-inputnilai-'));
+  const prevPath = process.env.DATABASE_PATH;
+  process.env.DATABASE_PATH = path.join(tmpDir, 'inputnilai.db');
+  resetDbConnection();
+  resetSeedFlag();
+
+  try {
+    await ensureSeeded();
+    const db = getDb();
+    const now = new Date().toISOString();
+    const [stu] = await db
+      .insert(students)
+      .values({
+        nisn: '9999000011',
+        nis: '9901',
+        fullName: 'Siswa Uji Input Nilai',
+        gender: 'L',
+        birthPlace: 'Jakarta',
+        birthDate: '2016-05-01',
+        religion: 'Islam',
+        address: 'Jl. Merdeka No. 1',
+        fatherName: 'Ayah Uji',
+        motherName: 'Ibu Uji',
+        parentPhone: '081234567890',
+        enrollmentDate: '2026-07-15',
+        status: 'Aktif',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    const [cls] = await db.select().from(classes).limit(1);
+    const [sub] = await db.select().from(subjects).limit(1);
+    const [sem] = await db.select().from(semesters).limit(1);
+    const [proj] = await db.select().from(cocurricularProjects).limit(1);
+    const [ek] = await db.select().from(extracurriculars).limit(1);
+    assert.ok(stu && cls && sub && sem && proj && ek);
+    const [savedSum] = await db
+      .insert(summativeScores)
+      .values({
+        studentId: stu.id,
+        subjectId: sub.id,
+        classId: cls.id,
+        semesterId: sem.id,
+        lm1: 88,
+        sts: 85,
+        sas: 90,
+        stsTes: 84,
+        stsNonTes: 86,
+        sasTes: 89,
+        sasNonTes: 91,
+        tpScoresJson: JSON.stringify({ '1': 88 }),
+        midtermScore: 86.71,
+        finalScore: 87.7,
+        updatedAt: now,
+      })
+      .returning();
+    assert.equal(savedSum.stsTes, 84);
+    assert.equal(savedSum.sasNonTes, 91);
+    assert.deepEqual(JSON.parse(savedSum.tpScoresJson), { '1': 88 });
+
+    const [savedCocu] = await db
+      .insert(cocurricularScores)
+      .values({
+        projectId: proj.id,
+        studentId: stu.id,
+        predicate: cocuDesc.predicate,
+        dimensionScoresJson: JSON.stringify({ Kolaborasi: 'Sangat Baik' }),
+        description: cocuDesc.description,
+        updatedAt: now,
+      })
+      .returning();
+    assert.deepEqual(JSON.parse(savedCocu.dimensionScoresJson), { Kolaborasi: 'Sangat Baik' });
+
+    const [savedEks] = await db
+      .insert(extracurricularScores)
+      .values({
+        extracurricularId: ek.id,
+        studentId: stu.id,
+        semesterId: sem.id,
+        predicate: eksDesc.predicate,
+        tpScoresJson: JSON.stringify([{ objective: 'Disiplin', predicate: 'Sangat Baik' }]),
+        description: eksDesc.description,
+        updatedAt: now,
+      })
+      .returning();
+    assert.equal(JSON.parse(savedEks.tpScoresJson).length, 1);
+  } finally {
+    resetDbConnection();
+    resetSeedFlag();
+    if (prevPath === undefined) delete process.env.DATABASE_PATH;
+    else process.env.DATABASE_PATH = prevPath;
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  }
+});
+
 
 
 

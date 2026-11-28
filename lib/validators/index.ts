@@ -196,23 +196,42 @@ export const teacherCreateSchema = z.object({
 });
 
 export const subjectCreateSchema = z.object({
-  code: z.string().trim().min(2, 'Kode mata pelajaran wajib diisi.'),
+  code: z.string().trim().max(30, 'Singkatan/kode maksimal 30 karakter.').optional().default(''),
   name: z.string().trim().min(2, 'Nama mata pelajaran wajib diisi.'),
   category: z.enum(['Wajib', 'Pilihan', 'Muatan Lokal']),
   gradeLevel: z.number().int().min(1).max(12),
   kkm: z.number().int().min(0).max(100),
-  weeklyHours: z.number().int().min(1).max(20),
+  weeklyHours: z.number().int().min(1).max(20).optional().default(2),
   teacherId: z.number().int().positive().nullable().optional(),
 });
 
 export const learningObjectiveSchema = z.object({
   subjectId: z.number().int().positive(),
   semesterId: z.number().int().positive(),
-  code: z.string().trim().min(2, 'Kode TP wajib diisi.'),
-  scopeMaterial: z.string().trim().min(2, 'Lingkup materi wajib diisi.'),
+  code: z.string().trim().max(30).optional().default(''),
+  scopeMaterial: z.string().trim().max(150).optional().default('Umum'),
   description: z.string().trim().min(5, 'Deskripsi Tujuan Pembelajaran minimal 5 karakter.'),
   atpOrder: z.number().int().min(1).default(1),
   kktpThreshold: z.number().int().min(0).max(100).default(75),
+});
+
+export const cocurricularProjectSchema = z.object({
+  id: z.number().int().positive().optional(),
+  classId: z.number().int().positive(),
+  code: z.string().trim().min(1, 'Kode kokurikuler wajib diisi.').max(30),
+  title: z.string().trim().min(3, 'Kegiatan kokurikuler minimal 3 karakter.').max(500),
+  dimensions: z
+    .array(z.string().trim().min(1))
+    .min(1, 'Pilih minimal 1 Dimensi Profil Lulusan (8 DPL).'),
+  description: z.string().trim().max(600).optional().default(''),
+});
+
+export const extracurricularSchema = z.object({
+  id: z.number().int().positive().optional(),
+  name: z.string().trim().min(2, 'Nama ekstrakurikuler wajib diisi.').max(120),
+  instructorName: z.string().trim().max(120).optional().default('-'),
+  scheduleDay: z.string().trim().max(40).optional().default('Sabtu'),
+  learningObjectives: z.array(z.string().trim().min(1)).optional(),
 });
 
 export const assessmentWeightSchema = z
@@ -242,6 +261,11 @@ export const summativeScoreUpdateSchema = z.object({
   lm4: nullableScore,
   sts: nullableScore,
   sas: nullableScore,
+  stsTes: nullableScore,
+  stsNonTes: nullableScore,
+  sasTes: nullableScore,
+  sasNonTes: nullableScore,
+  tpScores: z.record(z.string(), nullableScore).optional(),
   remedialScore: nullableScore,
   enrichmentNote: z.string().trim().optional().default(''),
   teacherNote: z.string().trim().optional().default(''),
@@ -253,9 +277,26 @@ export const formativeUpdateSchema = z.object({
   learningObjectiveId: z.number().int().positive(),
   classId: z.number().int().positive(),
   semesterId: z.number().int().positive(),
-  status: z.enum(['Tercapai', 'Perlu Pendalaman', 'Perlu Bimbingan']),
+  status: z.enum(['Tercapai', 'Perlu Pendalaman', 'Perlu Bimbingan', 'Belum Dinilai']),
   score: z.number().min(0).max(100).nullable().optional(),
   notes: z.string().trim().optional().default(''),
+});
+
+export const formativeBatchSchema = z.object({
+  studentId: z.number().int().positive(),
+  subjectId: z.number().int().positive(),
+  classId: z.number().int().positive(),
+  semesterId: z.number().int().positive(),
+  entries: z
+    .array(
+      z.object({
+        learningObjectiveId: z.number().int().positive(),
+        status: z.enum(['Tercapai', 'Perlu Pendalaman', 'Perlu Bimbingan', 'Belum Dinilai']),
+        score: z.number().min(0).max(100).nullable().optional(),
+        notes: z.string().trim().optional().default(''),
+      })
+    )
+    .min(1),
 });
 
 export const attendanceBatchSchema = z.object({
@@ -328,10 +369,11 @@ export const userScopeSchema = z.object({
 
 export const keasramaanIndicatorSchema = z.object({
   id: z.number().int().positive().optional(),
-  category: z.enum(['A. Kepemimpinan', 'B. Ketaatan Ibadah']),
-  name: z.string().trim().min(3, 'Nama indikator keasramaan minimal 3 karakter.').max(120),
+  category: z.string().trim().min(2, 'Kategori pembinaan minimal 2 karakter.').max(80),
+  name: z.string().trim().min(3, 'Nama indikator keasramaan minimal 3 karakter.').max(200),
   sortOrder: z.number().int().min(1).max(99).default(1),
   isActive: z.boolean().optional().default(true),
+  learningObjectives: z.array(z.string().trim().min(1)).optional(),
 });
 
 export const keasramaanScoreUpdateSchema = z.object({

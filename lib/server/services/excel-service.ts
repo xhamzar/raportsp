@@ -343,3 +343,97 @@ export async function generateAttendanceRecapWorkbook(params: {
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
 }
+
+export async function generateCocurricularTemplateWorkbook(params: {
+  className: string;
+  projectTitle: string;
+  dimensions: string[];
+  students: Array<{
+    nisn: string;
+    fullName: string;
+    dimensionScores: Record<string, string>;
+  }>;
+}): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Nilai Kokurikuler');
+
+  sheet.addRow([
+    `Kelas: ${params.className}`,
+    `Kegiatan Kokurikuler: ${params.projectTitle}`,
+    'Isi predikat: Sangat Baik / Baik / Cukup / Perlu Bimbingan',
+  ]);
+  sheet.getRow(1).font = { bold: true };
+
+  const headers = ['No', 'NISN', 'Nama Murid', ...params.dimensions];
+  const headerRow = sheet.addRow(headers);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F2942' } };
+
+  sheet.columns = [
+    { width: 6 },
+    { width: 16 },
+    { width: 28 },
+    ...params.dimensions.map(() => ({ width: 22 })),
+  ];
+
+  params.students.forEach((s, idx) => {
+    sheet.addRow([
+      idx + 1,
+      s.nisn,
+      s.fullName,
+      ...params.dimensions.map((d) => s.dimensionScores[d] || 'Baik'),
+    ]);
+  });
+
+  const arrayBuffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+export async function generateExtracurricularTemplateWorkbook(params: {
+  className: string;
+  extracurricularName: string;
+  objectives: string[];
+  students: Array<{
+    nisn: string;
+    fullName: string;
+    tpScores: Array<{ objective: string; predicate: string }>;
+    predicate: string;
+  }>;
+}): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Nilai Ekstrakurikuler');
+
+  sheet.addRow([
+    `Kelas: ${params.className}`,
+    `Ekstrakurikuler: ${params.extracurricularName}`,
+    'Isi nilai: Sangat Baik / Baik / Cukup / Kurang',
+  ]);
+  sheet.getRow(1).font = { bold: true };
+
+  const tpColumns =
+    params.objectives.length > 0 ? params.objectives : ['Predikat Umum'];
+  const headers = ['No', 'NISN', 'Nama Murid', ...tpColumns];
+  const headerRow = sheet.addRow(headers);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F2942' } };
+
+  sheet.columns = [
+    { width: 6 },
+    { width: 16 },
+    { width: 28 },
+    ...tpColumns.map(() => ({ width: 26 })),
+  ];
+
+  params.students.forEach((s, idx) => {
+    const scoreMap = new Map(s.tpScores.map((t) => [t.objective, t.predicate]));
+    const vals =
+      params.objectives.length > 0
+        ? params.objectives.map((obj) => scoreMap.get(obj) || (s.predicate !== '-' ? s.predicate : ''))
+        : [s.predicate !== '-' ? s.predicate : ''];
+    sheet.addRow([idx + 1, s.nisn, s.fullName, ...vals]);
+  });
+
+  const arrayBuffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
+}
+

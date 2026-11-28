@@ -101,6 +101,7 @@ export async function GET(req: NextRequest) {
           indicatorId: ind.id,
           category: ind.category,
           name: ind.name,
+          learningObjectives: JSON.parse(ind.learningObjectivesJson || '[]') as string[],
           predicate: sc?.predicate || 'B',
           achievedNote: sc?.achievedDescription || '',
           guidanceNote: sc?.guidanceDescription || '',
@@ -120,7 +121,10 @@ export async function GET(req: NextRequest) {
     semester: activeSemester,
     classes: scopedClasses,
     selectedClass: targetClass,
-    indicators,
+    indicators: indicators.map((ind) => ({
+      ...ind,
+      learningObjectives: JSON.parse(ind.learningObjectivesJson || '[]') as string[],
+    })),
     studentRows,
   });
 }
@@ -163,14 +167,18 @@ export async function POST(req: NextRequest) {
     }
 
     if (parsed.data.id) {
+      const updateSet: Partial<typeof keasramaanIndicators.$inferInsert> = {
+        category: parsed.data.category,
+        name: parsed.data.name,
+        sortOrder: parsed.data.sortOrder,
+        isActive: parsed.data.isActive,
+      };
+      if (parsed.data.learningObjectives !== undefined) {
+        updateSet.learningObjectivesJson = JSON.stringify(parsed.data.learningObjectives);
+      }
       await db
         .update(keasramaanIndicators)
-        .set({
-          category: parsed.data.category,
-          name: parsed.data.name,
-          sortOrder: parsed.data.sortOrder,
-          isActive: parsed.data.isActive,
-        })
+        .set(updateSet)
         .where(eq(keasramaanIndicators.id, parsed.data.id));
     } else {
       await db.insert(keasramaanIndicators).values({
@@ -178,6 +186,7 @@ export async function POST(req: NextRequest) {
         name: parsed.data.name,
         sortOrder: parsed.data.sortOrder,
         isActive: parsed.data.isActive,
+        learningObjectivesJson: JSON.stringify(parsed.data.learningObjectives || []),
       });
     }
 
@@ -190,6 +199,39 @@ export async function POST(req: NextRequest) {
       details: `${parsed.data.id ? 'Memperbarui' : 'Menambahkan'} indikator keasramaan "${parsed.data.name}" (${parsed.data.category}).`,
     });
 
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body?.kind === 'save_indicator_tp') {
+    const indicatorId = Number(body?.indicatorId);
+    const learningObjectives = Array.isArray(body?.learningObjectives)
+      ? body.learningObjectives
+          .map((item: unknown) => String(item || '').trim())
+          .filter((item: string) => item.length > 0)
+      : [];
+    if (!indicatorId) {
+      return NextResponse.json({ error: 'ID indikator tidak valid.' }, { status: 400 });
+    }
+    const [existing] = await db
+      .select()
+      .from(keasramaanIndicators)
+      .where(eq(keasramaanIndicators.id, indicatorId))
+      .limit(1);
+    if (!existing) {
+      return NextResponse.json({ error: 'Indikator keasramaan tidak ditemukan.' }, { status: 404 });
+    }
+    await db
+      .update(keasramaanIndicators)
+      .set({ learningObjectivesJson: JSON.stringify(learningObjectives) })
+      .where(eq(keasramaanIndicators.id, indicatorId));
+    await logAudit({
+      userId: auth.user.id,
+      actorName: auth.user.fullName,
+      action: 'UPDATE_KEASRAMAAN_TP',
+      entityType: 'keasramaan_indicators',
+      entityId: indicatorId,
+      details: `Memperbarui ${learningObjectives.length} tujuan pembinaan pada indikator "${existing.name}".`,
+    });
     return NextResponse.json({ ok: true });
   }
 
@@ -275,4 +317,49 @@ export async function POST(req: NextRequest) {
     { error: 'Aksi keasramaan tidak dikenali.' },
     { status: 400 }
   );
+}
+
+export async function DELETE(req: NextRequest) {
+  await ensureSeeded();
+  const auth = await requireApiAuth(req, 'keasramaan', 'delete');
+  if ('error' in auth) return auth.error;
+
+  const db = getDb();
+  const [school] = await db.select().from(schools).limit(1);
+  if (!school?.enableKeasramaan) {
+    return NextResponse.json(
+      {
+        error:
+          'Modul Keasramaan belum diaktifkan. Aktifkan terlebih dahulu pada halaman Pengaturan Sekolah.',
+      },
+      { status: 403 }
+    );
+  }
+
+  const { searchParams } = new URL(req.url);
+  const id = Number(searchParams.get('id') || 0);
+  if (!id) {
+    return NextResponse.json({ error: 'ID indikator tidak valid.' }, { status: 400 });
+  }
+
+  const [existing] = await db
+    .select()
+    .from(keasramaanIndicators)
+    .where(eq(keasramaanIndicators.id, id))
+    .limit(1);
+  if (!existing) {
+    return NextResponse.json({ error: 'Indikator tidak ditemukan.' }, { status: 404 });
+  }
+
+  await db.delete(keasramaanIndicators).where(eq(keasramaanIndicators.id, id));
+  await logAudit({
+    userId: auth.user.id,
+    actorName: auth.user.fullName,
+    action: 'DELETE_KEASRAMAAN_INDICATOR',
+    entityType: 'keasramaan_indicators',
+    entityId: id,
+    details: `Menghapus indikator keasramaan "${existing.name}".`,
+  });
+
+  return NextResponse.json({ ok: true });
 }

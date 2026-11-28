@@ -229,15 +229,29 @@ export async function POST(req: NextRequest) {
     }
     const g = parsed.data.gradeLevel;
     const fase = g <= 2 ? 'A' : g <= 4 ? 'B' : g <= 6 ? 'C' : g <= 9 ? 'D' : 'E';
+    const existingForGrade = await db
+      .select({ sortOrder: subjects.sortOrder })
+      .from(subjects)
+      .where(eq(subjects.gradeLevel, g));
+    const maxSort = existingForGrade.reduce((acc, s) => Math.max(acc, s.sortOrder), 0);
     const [created] = await db
       .insert(subjects)
       .values({
         ...parsed.data,
+        code: (parsed.data.code || '').trim(),
         fase,
-        sortOrder: 99,
+        sortOrder: maxSort + 1,
         teacherId: parsed.data.teacherId ?? null,
       })
       .returning();
+    await logAudit({
+      userId: auth.user.id,
+      actorName: auth.user.fullName,
+      action: 'CREATE_SUBJECT',
+      entityType: 'subject',
+      entityId: created.id,
+      details: `Menambahkan mata pelajaran ${created.name} (Kelas ${g}).`,
+    });
     return NextResponse.json({ ok: true, subject: created }, { status: 201 });
   }
 
@@ -258,8 +272,25 @@ export async function POST(req: NextRequest) {
   }
 
   if (body?.kind === 'tp') {
+    const rawSubjectId = Number(body?.subjectId);
+    const existingTps = rawSubjectId
+      ? await db
+          .select({ id: learningObjectives.id })
+          .from(learningObjectives)
+          .where(eq(learningObjectives.subjectId, rawSubjectId))
+      : [];
+    const [subjRow] = rawSubjectId
+      ? await db.select({ gradeLevel: subjects.gradeLevel }).from(subjects).where(eq(subjects.id, rawSubjectId)).limit(1)
+      : [];
+    const nextOrder = Number(body?.atpOrder) || existingTps.length + 1;
+    const autoCode = String(body?.code || '').trim() || `TP.${subjRow?.gradeLevel || 1}.${nextOrder}`;
+    const autoScope = String(body?.scopeMaterial || '').trim() || 'Umum';
+
     const parsed = learningObjectiveSchema.safeParse({
       ...body,
+      code: autoCode,
+      scopeMaterial: autoScope,
+      atpOrder: nextOrder,
       semesterId: body?.semesterId || activeSemester.id,
     });
     if (!parsed.success) {
@@ -440,16 +471,108 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (body?.kind === 'subject' && body.id) {
+    const schema = z.object({
+      id: z.number().int().positive(),
+      code: z.string().trim().max(30).optional(),
+      name: z.string().trim().min(2, 'Nama mata pelajaran wajib diisi.'),
+      category: z.enum(['Wajib', 'Pilihan', 'Muatan Lokal']),
+      kkm: z.number().int().min(0).max(100),
+      weeklyHours: z.number().int().min(1).max(20).optional(),
+      teacherId: z.number().int().positive().nullable().optional(),
+    });
+    const parsed = schema.safeParse({
+      ...body,
+      id: Number(body.id),
+      kkm: Number(body.kkm ?? 75),
+      weeklyHours: body.weeklyHours !== undefined ? Number(body.weeklyHours) : undefined,
+      teacherId: body.teacherId ? Number(body.teacherId) : null,
+    });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Data pembaruan mata pelajaran tidak valid.' },
+        { status: 400 }
+      );
+    }
+    const updateData: Partial<typeof subjects.$inferInsert> = {
+      name: parsed.data.name,
+      category: parsed.data.category,
+      kkm: parsed.data.kkm,
+      teacherId: parsed.data.teacherId ?? null,
+    };
+    if (parsed.data.code !== undefined) updateData.code = parsed.data.code;
+    if (parsed.data.weeklyHours !== undefined) updateData.weeklyHours = parsed.data.weeklyHours;
+    await db.update(subjects).set(updateData).where(eq(subjects.id, parsed.data.id));
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body?.kind === 'subject_reorder' && Array.isArray(body?.orderedIds)) {
+    const orderedIds = body.orderedIds
+      .map((x: unknown) => Number(x))
+      .filter((x: number) => Number.isInteger(x) && x > 0);
+    if (orderedIds.length === 0) {
+      return NextResponse.json({ error: 'Daftar urutan mata pelajaran kosong.' }, { status: 400 });
+    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < orderedIds.length; i++) {
+        await tx
+          .update(subjects)
+          .set({ sortOrder: i + 1 })
+          .where(eq(subjects.id, orderedIds[i]));
+      }
+    });
+    await logAudit({
+      userId: baseAuth.user.id,
+      actorName: baseAuth.user.fullName,
+      action: 'REORDER_SUBJECTS',
+      entityType: 'subject',
+      entityId: orderedIds[0],
+      details: `Memperbarui urutan ${orderedIds.length} mata pelajaran.`,
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (body?.kind === 'tp' && body.id) {
+    const schema = z.object({
+      id: z.number().int().positive(),
+      code: z.string().trim().max(30).optional(),
+      scopeMaterial: z.string().trim().max(150).optional(),
+      description: z.string().trim().min(5, 'Deskripsi TP minimal 5 karakter.'),
+      atpOrder: z.number().int().min(1).optional(),
+      kktpThreshold: z.number().int().min(0).max(100).optional(),
+    });
+    const parsed = schema.safeParse({
+      ...body,
+      id: Number(body.id),
+      atpOrder: body.atpOrder !== undefined ? Number(body.atpOrder) : undefined,
+      kktpThreshold: body.kktpThreshold !== undefined ? Number(body.kktpThreshold) : undefined,
+    });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Data pembaruan TP tidak valid.' },
+        { status: 400 }
+      );
+    }
+    const [existing] = await db
+      .select()
+      .from(learningObjectives)
+      .where(eq(learningObjectives.id, parsed.data.id))
+      .limit(1);
+    if (!existing) {
+      return NextResponse.json({ error: 'Tujuan Pembelajaran tidak ditemukan.' }, { status: 404 });
+    }
     await db
-      .update(subjects)
+      .update(learningObjectives)
       .set({
-        name: body.name,
-        category: body.category,
-        kkm: Number(body.kkm ?? 75),
-        weeklyHours: Number(body.weeklyHours ?? 4),
-        teacherId: body.teacherId ?? null,
+        code: parsed.data.code !== undefined ? parsed.data.code || existing.code : existing.code,
+        scopeMaterial:
+          parsed.data.scopeMaterial !== undefined
+            ? parsed.data.scopeMaterial || existing.scopeMaterial
+            : existing.scopeMaterial,
+        description: parsed.data.description,
+        atpOrder: parsed.data.atpOrder ?? existing.atpOrder,
+        kktpThreshold: parsed.data.kktpThreshold ?? existing.kktpThreshold,
       })
-      .where(eq(subjects.id, Number(body.id)));
+      .where(eq(learningObjectives.id, parsed.data.id));
     return NextResponse.json({ ok: true });
   }
 

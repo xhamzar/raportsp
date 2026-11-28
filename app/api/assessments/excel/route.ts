@@ -10,6 +10,7 @@ import {
   classStudents,
   cocurricularProjects,
   cocurricularScores,
+  extracurriculars,
   extracurricularScores,
   schools,
   semesters,
@@ -20,6 +21,14 @@ import {
 } from '@/lib/server/db/schema';
 import { calculateSummativeScores } from '@/lib/server/services/assessment-engine';
 import {
+  buildCocurricularDescription,
+  buildExtracurricularDescription,
+  type CocurricularPredicate,
+  type ExtracurricularPredicate,
+} from '@/lib/assessment-helpers';
+import {
+  generateCocurricularTemplateWorkbook,
+  generateExtracurricularTemplateWorkbook,
   generateLegerWorkbook,
   generateSummativeTemplateWorkbook,
 } from '@/lib/server/services/excel-service';
@@ -109,7 +118,103 @@ export async function GET(req: NextRequest) {
       }),
     });
 
-    const safeFile = sanitizeFilename(`template-nilai-${cls.name.replace(/\s+/g, '')}-${sub.code}.xlsx`);
+    const safeFile = sanitizeFilename(
+      `template-nilai-${cls.name.replace(/\s+/g, '')}-${sub.code || sub.name.slice(0, 12)}.xlsx`
+    );
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${safeFile}"`,
+      },
+    });
+  }
+
+  if (mode === 'kokurikuler_template') {
+    const projectId = Number(searchParams.get('projectId') || 0);
+    const proj = projectId
+      ? (await db.select().from(cocurricularProjects).where(eq(cocurricularProjects.id, projectId)).limit(1))[0]
+      : (await db.select().from(cocurricularProjects).where(eq(cocurricularProjects.classId, cls.id)).limit(1))[0];
+    if (!proj) {
+      return NextResponse.json({ error: 'Kegiatan kokurikuler tidak ditemukan.' }, { status: 404 });
+    }
+    const dimensions = JSON.parse(proj.dimensionsJson || '[]') as string[];
+    const existingScores = await db
+      .select()
+      .from(cocurricularScores)
+      .where(eq(cocurricularScores.projectId, proj.id));
+    const scoreByStudent = new Map(existingScores.map((s) => [s.studentId, s]));
+
+    const buf = await generateCocurricularTemplateWorkbook({
+      className: cls.name,
+      projectTitle: proj.title,
+      dimensions,
+      students: roster.map((r) => {
+        const sc = scoreByStudent.get(r.studentId);
+        let dimensionScores: Record<string, string> = {};
+        try {
+          dimensionScores = sc?.dimensionScoresJson ? JSON.parse(sc.dimensionScoresJson) : {};
+        } catch {
+          dimensionScores = {};
+        }
+        return { nisn: r.nisn, fullName: r.fullName, dimensionScores };
+      }),
+    });
+
+    const safeFile = sanitizeFilename(
+      `template-kokurikuler-${cls.name.replace(/\s+/g, '')}-${proj.code || 'proyek'}.xlsx`
+    );
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${safeFile}"`,
+      },
+    });
+  }
+
+  if (mode === 'ekskul_template') {
+    const extracurricularId = Number(searchParams.get('extracurricularId') || 0);
+    const eks = extracurricularId
+      ? (await db.select().from(extracurriculars).where(eq(extracurriculars.id, extracurricularId)).limit(1))[0]
+      : (await db.select().from(extracurriculars).limit(1))[0];
+    if (!eks) {
+      return NextResponse.json({ error: 'Kegiatan ekstrakurikuler tidak ditemukan.' }, { status: 404 });
+    }
+    const objectives = JSON.parse(eks.learningObjectivesJson || '[]') as string[];
+    const existingScores = await db
+      .select()
+      .from(extracurricularScores)
+      .where(
+        and(
+          eq(extracurricularScores.extracurricularId, eks.id),
+          eq(extracurricularScores.semesterId, activeSemester.id)
+        )
+      );
+    const scoreByStudent = new Map(existingScores.map((s) => [s.studentId, s]));
+
+    const buf = await generateExtracurricularTemplateWorkbook({
+      className: cls.name,
+      extracurricularName: eks.name,
+      objectives,
+      students: roster.map((r) => {
+        const sc = scoreByStudent.get(r.studentId);
+        let tpScores: Array<{ objective: string; predicate: string }> = [];
+        try {
+          tpScores = sc?.tpScoresJson ? JSON.parse(sc.tpScoresJson) : [];
+        } catch {
+          tpScores = [];
+        }
+        return {
+          nisn: r.nisn,
+          fullName: r.fullName,
+          tpScores,
+          predicate: sc?.predicate || '-',
+        };
+      }),
+    });
+
+    const safeFile = sanitizeFilename(
+      `template-ekstrakurikuler-${cls.name.replace(/\s+/g, '')}-${eks.name.slice(0, 14)}.xlsx`
+    );
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -220,12 +325,33 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData().catch(() => null);
   const file = formData?.get('file') as File | null;
+  const importMode = String(formData?.get('mode') || 'summative');
   const classId = Number(formData?.get('classId') || 0);
   const subjectId = Number(formData?.get('subjectId') || 0);
+  const projectId = Number(formData?.get('projectId') || 0);
+  const extracurricularId = Number(formData?.get('extracurricularId') || 0);
 
-  if (!file || !classId || !subjectId) {
+  if (!file || !classId) {
     return NextResponse.json(
-      { error: 'File Excel, rombel, dan mata pelajaran wajib disertakan.' },
+      { error: 'Berkas Excel dan rombel aktif wajib disertakan.' },
+      { status: 400 }
+    );
+  }
+  if (importMode === 'summative' && !subjectId) {
+    return NextResponse.json(
+      { error: 'Mata pelajaran wajib dipilih untuk impor nilai sumatif.' },
+      { status: 400 }
+    );
+  }
+  if (importMode === 'kokurikuler' && !projectId) {
+    return NextResponse.json(
+      { error: 'Kegiatan kokurikuler wajib dipilih.' },
+      { status: 400 }
+    );
+  }
+  if (importMode === 'ekskul' && !extracurricularId) {
+    return NextResponse.json(
+      { error: 'Ekstrakurikuler wajib dipilih.' },
       { status: 400 }
     );
   }
@@ -241,7 +367,7 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-  if (!canTeacherAccessScope(auth.user, classId, subjectId)) {
+  if (!canTeacherAccessScope(auth.user, classId, importMode === 'summative' ? subjectId : undefined)) {
     return NextResponse.json(
       { error: 'Anda tidak ditugaskan pada kelas/mata pelajaran ini.' },
       { status: 403 }
@@ -264,6 +390,186 @@ export async function POST(req: NextRequest) {
 
   const db = getDb();
   const [activeSemester] = await db.select().from(semesters).where(eq(semesters.isActive, true)).limit(1);
+  const allStudents = await db.select().from(students);
+  const byNisn = new Map(allStudents.map((s) => [s.nisn, s.id]));
+  const now = new Date().toISOString();
+
+  if (importMode === 'kokurikuler') {
+    const [proj] = await db
+      .select()
+      .from(cocurricularProjects)
+      .where(eq(cocurricularProjects.id, projectId))
+      .limit(1);
+    if (!proj) {
+      return NextResponse.json({ error: 'Kegiatan kokurikuler tidak ditemukan.' }, { status: 404 });
+    }
+    const dimensions = JSON.parse(proj.dimensionsJson || '[]') as string[];
+    const normalizeCocuPred = (raw: string): CocurricularPredicate => {
+      const low = raw.trim().toLowerCase();
+      if (low.includes('sangat')) return 'Sangat Baik';
+      if (low.includes('cukup')) return 'Cukup';
+      if (low.includes('bimbingan') || low.includes('perlu')) return 'Perlu Bimbingan';
+      return 'Baik';
+    };
+
+    let updated = 0;
+    await db.transaction(async (tx) => {
+      for (let rIdx = 3; rIdx <= sheet.rowCount; rIdx++) {
+        const row = sheet.getRow(rIdx);
+        const nisn = String(row.getCell(2).text || row.getCell(2).value || '').trim();
+        const studentId = byNisn.get(nisn);
+        if (!studentId) continue;
+
+        const dimScores: Record<string, string> = {};
+        let hasAny = false;
+        dimensions.forEach((dim, dIdx) => {
+          const rawCell = String(row.getCell(4 + dIdx).text || row.getCell(4 + dIdx).value || '').trim();
+          if (rawCell) {
+            hasAny = true;
+            dimScores[dim] = normalizeCocuPred(rawCell);
+          } else {
+            dimScores[dim] = 'Baik';
+          }
+        });
+        if (!hasAny) continue;
+
+        const generated = buildCocurricularDescription(dimensions, dimScores);
+        const existing = await tx
+          .select()
+          .from(cocurricularScores)
+          .where(and(eq(cocurricularScores.projectId, projectId), eq(cocurricularScores.studentId, studentId)))
+          .limit(1);
+        if (existing.length > 0) {
+          await tx
+            .update(cocurricularScores)
+            .set({
+              predicate: generated.predicate,
+              dimensionScoresJson: JSON.stringify(dimScores),
+              description: generated.description,
+              updatedAt: now,
+            })
+            .where(eq(cocurricularScores.id, existing[0].id));
+        } else {
+          await tx.insert(cocurricularScores).values({
+            projectId,
+            studentId,
+            predicate: generated.predicate,
+            dimensionScoresJson: JSON.stringify(dimScores),
+            description: generated.description,
+            updatedAt: now,
+          });
+        }
+        updated++;
+      }
+    });
+
+    await logAudit({
+      userId: auth.user.id,
+      actorName: auth.user.fullName,
+      action: 'IMPORT_COCURRICULAR_EXCEL',
+      entityType: 'cocurricular_scores',
+      entityId: `${classId}-${projectId}`,
+      details: `Mengimpor nilai kokurikuler untuk ${updated} murid dari ${file.name}.`,
+    });
+
+    return NextResponse.json({ ok: true, updated });
+  }
+
+  if (importMode === 'ekskul') {
+    const [eks] = await db
+      .select()
+      .from(extracurriculars)
+      .where(eq(extracurriculars.id, extracurricularId))
+      .limit(1);
+    if (!eks) {
+      return NextResponse.json({ error: 'Ekstrakurikuler tidak ditemukan.' }, { status: 404 });
+    }
+    const objectives = JSON.parse(eks.learningObjectivesJson || '[]') as string[];
+    const normalizeEksPred = (raw: string): ExtracurricularPredicate => {
+      const low = raw.trim().toLowerCase();
+      if (low.includes('sangat')) return 'Sangat Baik';
+      if (low.includes('cukup')) return 'Cukup';
+      if (low.includes('kurang')) return 'Kurang';
+      return 'Baik';
+    };
+
+    let updated = 0;
+    await db.transaction(async (tx) => {
+      for (let rIdx = 3; rIdx <= sheet.rowCount; rIdx++) {
+        const row = sheet.getRow(rIdx);
+        const nisn = String(row.getCell(2).text || row.getCell(2).value || '').trim();
+        const studentId = byNisn.get(nisn);
+        if (!studentId) continue;
+
+        let tpScores: Array<{ objective: string; predicate: string }> = [];
+        let finalPredicate: ExtracurricularPredicate = 'Baik';
+        let finalDesc = '';
+
+        if (objectives.length > 0) {
+          let hasAny = false;
+          tpScores = objectives.map((obj, oIdx) => {
+            const rawCell = String(row.getCell(4 + oIdx).text || row.getCell(4 + oIdx).value || '').trim();
+            if (rawCell) hasAny = true;
+            return { objective: obj, predicate: rawCell ? normalizeEksPred(rawCell) : 'Baik' };
+          });
+          if (!hasAny) continue;
+          const generated = buildExtracurricularDescription(tpScores);
+          finalPredicate = generated.predicate;
+          finalDesc = generated.description;
+        } else {
+          const rawCell = String(row.getCell(4).text || row.getCell(4).value || '').trim();
+          if (!rawCell) continue;
+          finalPredicate = normalizeEksPred(rawCell);
+          finalDesc = `Ananda ${finalPredicate.toLowerCase()} dalam berpartisipasi aktif pada kegiatan ${eks.name}.`;
+        }
+
+        const existing = await tx
+          .select()
+          .from(extracurricularScores)
+          .where(
+            and(
+              eq(extracurricularScores.extracurricularId, extracurricularId),
+              eq(extracurricularScores.studentId, studentId),
+              eq(extracurricularScores.semesterId, activeSemester.id)
+            )
+          )
+          .limit(1);
+        if (existing.length > 0) {
+          await tx
+            .update(extracurricularScores)
+            .set({
+              predicate: finalPredicate,
+              tpScoresJson: JSON.stringify(tpScores),
+              description: finalDesc,
+              updatedAt: now,
+            })
+            .where(eq(extracurricularScores.id, existing[0].id));
+        } else {
+          await tx.insert(extracurricularScores).values({
+            extracurricularId,
+            studentId,
+            semesterId: activeSemester.id,
+            predicate: finalPredicate,
+            tpScoresJson: JSON.stringify(tpScores),
+            description: finalDesc,
+            updatedAt: now,
+          });
+        }
+        updated++;
+      }
+    });
+
+    await logAudit({
+      userId: auth.user.id,
+      actorName: auth.user.fullName,
+      action: 'IMPORT_EXTRACURRICULAR_EXCEL',
+      entityType: 'extracurricular_scores',
+      entityId: `${classId}-${extracurricularId}`,
+      details: `Mengimpor nilai ekstrakurikuler untuk ${updated} murid dari ${file.name}.`,
+    });
+
+    return NextResponse.json({ ok: true, updated });
+  }
   const [w] = await db
     .select()
     .from(assessmentWeights)
@@ -277,9 +583,6 @@ export async function POST(req: NextRequest) {
     .limit(1);
   const weights = w || { weightLm: 40, weightSts: 30, weightSas: 30, kktpMin: 75 };
 
-  const allStudents = await db.select().from(students);
-  const byNisn = new Map(allStudents.map((s) => [s.nisn, s.id]));
-
   const parseNum = (val: unknown): number | null => {
     if (val === null || val === undefined || String(val).trim() === '') return null;
     const n = Number(val);
@@ -288,7 +591,6 @@ export async function POST(req: NextRequest) {
   };
 
   let updated = 0;
-  const now = new Date().toISOString();
 
   await db.transaction(async (tx) => {
     for (let rIdx = 3; rIdx <= sheet.rowCount; rIdx++) {

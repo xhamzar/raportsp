@@ -643,6 +643,11 @@ export const summativeScores = sqliteTable(
     lm4: real('lm4'),
     sts: real('sts'),
     sas: real('sas'),
+    stsTes: real('sts_tes'),
+    stsNonTes: real('sts_non_tes'),
+    sasTes: real('sas_tes'),
+    sasNonTes: real('sas_non_tes'),
+    tpScoresJson: text('tp_scores_json').notNull().default('{}'),
     midtermScore: real('midterm_score'),
     finalScore: real('final_score'),
     teacherNote: text('teacher_note').default(''),
@@ -684,6 +689,7 @@ export const cocurricularScores = sqliteTable(
       .notNull()
       .references(() => students.id, { onDelete: 'cascade' }),
     predicate: text('predicate').notNull().default('Baik'), // Sangat Baik | Baik | Cukup | Perlu Bimbingan
+    dimensionScoresJson: text('dimension_scores_json').notNull().default('{}'),
     description: text('description').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -712,6 +718,7 @@ export const extracurricularScores = sqliteTable(
       .notNull()
       .references(() => semesters.id, { onDelete: 'cascade' }),
     predicate: text('predicate').notNull().default('Baik'), // Sangat Baik | Baik | Cukup | Kurang
+    tpScoresJson: text('tp_scores_json').notNull().default('[]'),
     description: text('description').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -767,10 +774,11 @@ export const homeroomNotes = sqliteTable(
 
 export const keasramaanIndicators = sqliteTable('keasramaan_indicators', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  category: text('category').notNull(), // A. Kepemimpinan | B. Ketaatan Ibadah
+  category: text('category').notNull(), // A. Kepemimpinan | B. Ketaatan Ibadah | custom
   name: text('name').notNull(),
   sortOrder: integer('sort_order').notNull().default(1),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  learningObjectivesJson: text('learning_objectives_json').notNull().default('[]'),
 });
 
 export const keasramaanScores = sqliteTable(

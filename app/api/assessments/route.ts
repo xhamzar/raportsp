@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { ensureSeeded } from '@/lib/server/db/seed';
 import { getDb } from '@/lib/server/db';
@@ -21,10 +21,19 @@ import {
 } from '@/lib/server/db/schema';
 import {
   assessmentWeightSchema,
+  cocurricularProjectSchema,
+  extracurricularSchema,
+  formativeBatchSchema,
   formativeUpdateSchema,
   summativeScoreUpdateSchema,
 } from '@/lib/validators';
 import { calculateSummativeScores } from '@/lib/server/services/assessment-engine';
+import {
+  buildCocurricularDescription,
+  buildExtracurricularDescription,
+  computeAverageTwo,
+  computeScopeAveragesFromTpScores,
+} from '@/lib/assessment-helpers';
 import {
   canTeacherAccessScope,
   hasUserPermission,
@@ -34,7 +43,7 @@ import {
 
 export async function GET(req: NextRequest) {
   await ensureSeeded();
-  const auth = await requireApiAuth(req, ['penilaian', 'rapor'], 'read');
+  const auth = await requireApiAuth(req, ['penilaian', 'rapor', 'kurikulum'], 'read');
   if ('error' in auth) return auth.error;
 
   const { searchParams } = new URL(req.url);
@@ -125,6 +134,15 @@ export async function GET(req: NextRequest) {
     if (w) weights = w;
   }
 
+  // Learning objectives for target subject
+  const subjectTps = targetSubject
+    ? await db
+        .select()
+        .from(learningObjectives)
+        .where(eq(learningObjectives.subjectId, targetSubject.id))
+        .orderBy(asc(learningObjectives.atpOrder))
+    : [];
+
   const allClassSummative = await db
     .select()
     .from(summativeScores)
@@ -143,12 +161,27 @@ export async function GET(req: NextRequest) {
     const existing = targetSubject
       ? summativeMap.get(`${stu.studentId}:${targetSubject.id}`)
       : undefined;
+    let parsedTpScores: Record<string, number | null> = {};
+    try {
+      parsedTpScores = existing?.tpScoresJson ? JSON.parse(existing.tpScoresJson) : {};
+    } catch {
+      parsedTpScores = {};
+    }
+    const hasTpValues = Object.values(parsedTpScores).some(
+      (v) => typeof v === 'number' && Number.isFinite(v)
+    );
+    const scopeCalc =
+      hasTpValues && subjectTps.length > 0
+        ? computeScopeAveragesFromTpScores(subjectTps, parsedTpScores)
+        : null;
+
     const breakdown = calculateSummativeScores(
       {
         lm1: existing?.lm1,
         lm2: existing?.lm2,
         lm3: existing?.lm3,
         lm4: existing?.lm4,
+        lmAverageOverride: scopeCalc?.lmAverage ?? undefined,
         sts: existing?.sts,
         sas: existing?.sas,
         remedialScore: existing?.remedialScore,
@@ -163,6 +196,12 @@ export async function GET(req: NextRequest) {
       lm4: existing?.lm4 ?? null,
       sts: existing?.sts ?? null,
       sas: existing?.sas ?? null,
+      stsTes: existing?.stsTes ?? null,
+      stsNonTes: existing?.stsNonTes ?? null,
+      sasTes: existing?.sasTes ?? null,
+      sasNonTes: existing?.sasNonTes ?? null,
+      tpScores: parsedTpScores,
+      scopeSummaries: scopeCalc?.scopes || [],
       remedialScore: existing?.remedialScore ?? null,
       enrichmentNote: existing?.enrichmentNote ?? '',
       teacherNote: existing?.teacherNote ?? '',
@@ -172,15 +211,6 @@ export async function GET(req: NextRequest) {
       kktpPassed: breakdown.kktpPassed,
     };
   });
-
-  // Formative TP progress for target subject
-  const subjectTps = targetSubject
-    ? await db
-        .select()
-        .from(learningObjectives)
-        .where(eq(learningObjectives.subjectId, targetSubject.id))
-        .orderBy(asc(learningObjectives.atpOrder))
-    : [];
 
   const formativeRows = targetSubject
     ? await db
@@ -303,10 +333,17 @@ export async function GET(req: NextRequest) {
       dimensions: JSON.parse(p.dimensionsJson || '[]'),
       scores: roster.map((stu) => {
         const sc = cocuScoreMap.get(`${p.id}:${stu.studentId}`);
+        let dimensionScores: Record<string, string> = {};
+        try {
+          dimensionScores = sc?.dimensionScoresJson ? JSON.parse(sc.dimensionScoresJson) : {};
+        } catch {
+          dimensionScores = {};
+        }
         return {
           studentId: stu.studentId,
           fullName: stu.fullName,
-          predicate: sc?.predicate || 'Baik',
+          predicate: sc?.predicate || '',
+          dimensionScores,
           description: sc?.description || '',
         };
       }),
@@ -316,10 +353,17 @@ export async function GET(req: NextRequest) {
       objectives: JSON.parse(e.learningObjectivesJson || '[]'),
       scores: roster.map((stu) => {
         const sc = ekstraMap.get(`${e.id}:${stu.studentId}`);
+        let tpScores: Array<{ objective: string; predicate: string }> = [];
+        try {
+          tpScores = sc?.tpScoresJson ? JSON.parse(sc.tpScoresJson) : [];
+        } catch {
+          tpScores = [];
+        }
         return {
           studentId: stu.studentId,
           fullName: stu.fullName,
           predicate: sc?.predicate || '-',
+          tpScores,
           description: sc?.description || '',
         };
       }),
@@ -339,14 +383,35 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   await ensureSeeded();
-  const auth = await requireApiAuth(req, ['penilaian', 'rapor'], 'update');
+  const auth = await requireApiAuth(req, ['penilaian', 'rapor', 'kurikulum'], 'read');
   if ('error' in auth) return auth.error;
 
   const body = await req.json().catch(() => null);
-  const isHomeroomNote = body?.kind === 'homeroom_note';
-  if (!isHomeroomNote && !hasUserPermission(auth.user, 'penilaian', 'update')) {
+  const kind = String(body?.kind || '');
+  const isHomeroomNote = kind === 'homeroom_note';
+  const isMasterSetup = kind === 'cocurricular_project' || kind === 'extracurricular';
+
+  if (isMasterSetup) {
+    const action = body?.id ? 'update' : 'create';
+    const allowed =
+      hasUserPermission(auth.user, 'kurikulum', action) ||
+      hasUserPermission(auth.user, 'penilaian', action);
+    if (!allowed) {
+      return NextResponse.json(
+        {
+          error: `Akses ditolak: peran ${auth.user.roleName} tidak memiliki izin mengelola daftar ini.`,
+        },
+        { status: 403 }
+      );
+    }
+  } else if (!isHomeroomNote && !hasUserPermission(auth.user, 'penilaian', 'update')) {
     return NextResponse.json(
       { error: `Akses ditolak: peran ${auth.user.roleName} tidak memiliki izin Ubah pada modul penilaian.` },
+      { status: 403 }
+    );
+  } else if (isHomeroomNote && !hasUserPermission(auth.user, 'penilaian', 'update') && !hasUserPermission(auth.user, 'rapor', 'update')) {
+    return NextResponse.json(
+      { error: `Akses ditolak: peran ${auth.user.roleName} tidak memiliki izin memperbarui catatan wali kelas.` },
       { status: 403 }
     );
   }
@@ -405,6 +470,11 @@ export async function POST(req: NextRequest) {
       }
 
       // Recalculate existing summative scores for this subject/class
+      const tps = await tx
+        .select({ id: learningObjectives.id, scopeMaterial: learningObjectives.scopeMaterial })
+        .from(learningObjectives)
+        .where(eq(learningObjectives.subjectId, parsed.data.subjectId))
+        .orderBy(asc(learningObjectives.atpOrder));
       const rows = await tx
         .select()
         .from(summativeScores)
@@ -416,7 +486,17 @@ export async function POST(req: NextRequest) {
           )
         );
       for (const r of rows) {
-        const calc = calculateSummativeScores(r, parsed.data);
+        let lmAverageOverride: number | undefined;
+        try {
+          const tpScores = r.tpScoresJson ? JSON.parse(r.tpScoresJson) : {};
+          if (tps.length > 0 && Object.values(tpScores).some((v) => typeof v === 'number')) {
+            const sc = computeScopeAveragesFromTpScores(tps, tpScores);
+            if (sc.lmAverage !== null) lmAverageOverride = sc.lmAverage;
+          }
+        } catch {
+          lmAverageOverride = undefined;
+        }
+        const calc = calculateSummativeScores({ ...r, lmAverageOverride }, parsed.data);
         await tx
           .update(summativeScores)
           .set({ midtermScore: calc.midtermScore, finalScore: calc.finalScore, updatedAt: now })
@@ -457,7 +537,56 @@ export async function POST(req: NextRequest) {
       )
       .limit(1);
 
-    const calc = calculateSummativeScores(parsed.data, w || { weightLm: 40, weightSts: 30, weightSas: 30, kktpMin: 75 });
+    let lm1 = parsed.data.lm1 ?? null;
+    let lm2 = parsed.data.lm2 ?? null;
+    let lm3 = parsed.data.lm3 ?? null;
+    let lm4 = parsed.data.lm4 ?? null;
+    let lmAverageOverride: number | undefined;
+    const tpScoresObj = parsed.data.tpScores;
+
+    if (tpScoresObj && Object.keys(tpScoresObj).length > 0) {
+      const tps = await db
+        .select({ id: learningObjectives.id, scopeMaterial: learningObjectives.scopeMaterial })
+        .from(learningObjectives)
+        .where(eq(learningObjectives.subjectId, parsed.data.subjectId))
+        .orderBy(asc(learningObjectives.atpOrder));
+      const scopeCalc = computeScopeAveragesFromTpScores(tps, tpScoresObj);
+      lm1 = scopeCalc.lm1;
+      lm2 = scopeCalc.lm2;
+      lm3 = scopeCalc.lm3;
+      lm4 = scopeCalc.lm4;
+      if (scopeCalc.lmAverage !== null) {
+        lmAverageOverride = scopeCalc.lmAverage;
+      }
+    }
+
+    const stsTesVal = parsed.data.stsTes !== undefined ? parsed.data.stsTes : undefined;
+    const stsNonTesVal = parsed.data.stsNonTes !== undefined ? parsed.data.stsNonTes : undefined;
+    const computedSts =
+      stsTesVal !== undefined || stsNonTesVal !== undefined
+        ? computeAverageTwo(stsTesVal ?? null, stsNonTesVal ?? null)
+        : parsed.data.sts ?? null;
+
+    const sasTesVal = parsed.data.sasTes !== undefined ? parsed.data.sasTes : undefined;
+    const sasNonTesVal = parsed.data.sasNonTes !== undefined ? parsed.data.sasNonTes : undefined;
+    const computedSas =
+      sasTesVal !== undefined || sasNonTesVal !== undefined
+        ? computeAverageTwo(sasTesVal ?? null, sasNonTesVal ?? null)
+        : parsed.data.sas ?? null;
+
+    const calc = calculateSummativeScores(
+      {
+        lm1,
+        lm2,
+        lm3,
+        lm4,
+        lmAverageOverride,
+        sts: computedSts,
+        sas: computedSas,
+        remedialScore: parsed.data.remedialScore,
+      },
+      w || { weightLm: 40, weightSts: 30, weightSas: 30, kktpMin: 75 }
+    );
 
     const existing = await db
       .select()
@@ -471,16 +600,23 @@ export async function POST(req: NextRequest) {
       )
       .limit(1);
 
+    const tpScoresJson = JSON.stringify(tpScoresObj || {});
+
     if (existing.length > 0) {
       await db
         .update(summativeScores)
         .set({
-          lm1: parsed.data.lm1 ?? null,
-          lm2: parsed.data.lm2 ?? null,
-          lm3: parsed.data.lm3 ?? null,
-          lm4: parsed.data.lm4 ?? null,
-          sts: parsed.data.sts ?? null,
-          sas: parsed.data.sas ?? null,
+          lm1,
+          lm2,
+          lm3,
+          lm4,
+          sts: computedSts,
+          sas: computedSas,
+          stsTes: stsTesVal !== undefined ? stsTesVal : existing[0].stsTes,
+          stsNonTes: stsNonTesVal !== undefined ? stsNonTesVal : existing[0].stsNonTes,
+          sasTes: sasTesVal !== undefined ? sasTesVal : existing[0].sasTes,
+          sasNonTes: sasNonTesVal !== undefined ? sasNonTesVal : existing[0].sasNonTes,
+          tpScoresJson: tpScoresObj !== undefined ? tpScoresJson : existing[0].tpScoresJson,
           remedialScore: parsed.data.remedialScore ?? null,
           enrichmentNote: parsed.data.enrichmentNote,
           teacherNote: parsed.data.teacherNote,
@@ -495,12 +631,17 @@ export async function POST(req: NextRequest) {
         subjectId: parsed.data.subjectId,
         classId: parsed.data.classId,
         semesterId: parsed.data.semesterId,
-        lm1: parsed.data.lm1 ?? null,
-        lm2: parsed.data.lm2 ?? null,
-        lm3: parsed.data.lm3 ?? null,
-        lm4: parsed.data.lm4 ?? null,
-        sts: parsed.data.sts ?? null,
-        sas: parsed.data.sas ?? null,
+        lm1,
+        lm2,
+        lm3,
+        lm4,
+        sts: computedSts,
+        sas: computedSas,
+        stsTes: stsTesVal ?? null,
+        stsNonTes: stsNonTesVal ?? null,
+        sasTes: sasTesVal ?? null,
+        sasNonTes: sasNonTesVal ?? null,
+        tpScoresJson,
         remedialScore: parsed.data.remedialScore ?? null,
         enrichmentNote: parsed.data.enrichmentNote,
         teacherNote: parsed.data.teacherNote,
@@ -540,6 +681,13 @@ export async function POST(req: NextRequest) {
       )
       .limit(1);
 
+    if (parsed.data.status === 'Belum Dinilai') {
+      if (existing.length > 0) {
+        await db.delete(formativeAssessments).where(eq(formativeAssessments.id, existing[0].id));
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     if (existing.length > 0) {
       await db
         .update(formativeAssessments)
@@ -560,17 +708,111 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  if (body?.kind === 'formative_batch') {
+    const parsed = formativeBatchSchema.safeParse({
+      ...body,
+      semesterId: body.semesterId || activeSemester.id,
+    });
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Data asesmen formatif murid tidak valid.' }, { status: 400 });
+    }
+    if (!canTeacherAccessScope(auth.user, parsed.data.classId, parsed.data.subjectId)) {
+      return NextResponse.json(
+        { error: 'Anda tidak ditugaskan pada kelas/mata pelajaran ini.' },
+        { status: 403 }
+      );
+    }
+
+    await db.transaction(async (tx) => {
+      for (const entry of parsed.data.entries) {
+        const existing = await tx
+          .select()
+          .from(formativeAssessments)
+          .where(
+            and(
+              eq(formativeAssessments.studentId, parsed.data.studentId),
+              eq(formativeAssessments.learningObjectiveId, entry.learningObjectiveId),
+              eq(formativeAssessments.semesterId, parsed.data.semesterId)
+            )
+          )
+          .limit(1);
+
+        if (entry.status === 'Belum Dinilai') {
+          if (existing.length > 0) {
+            await tx.delete(formativeAssessments).where(eq(formativeAssessments.id, existing[0].id));
+          }
+        } else if (existing.length > 0) {
+          await tx
+            .update(formativeAssessments)
+            .set({
+              status: entry.status,
+              score: entry.score ?? null,
+              notes: entry.notes,
+              updatedAt: now,
+            })
+            .where(eq(formativeAssessments.id, existing[0].id));
+        } else {
+          await tx.insert(formativeAssessments).values({
+            studentId: parsed.data.studentId,
+            subjectId: parsed.data.subjectId,
+            learningObjectiveId: entry.learningObjectiveId,
+            classId: parsed.data.classId,
+            semesterId: parsed.data.semesterId,
+            status: entry.status,
+            score: entry.score ?? null,
+            notes: entry.notes,
+            updatedAt: now,
+          });
+        }
+      }
+    });
+
+    return NextResponse.json({ ok: true });
+  }
+
   if (body?.kind === 'cocurricular_score') {
     const schema = z.object({
       projectId: z.number().int().positive(),
       studentId: z.number().int().positive(),
-      predicate: z.enum(['Sangat Baik', 'Baik', 'Cukup', 'Perlu Bimbingan']),
-      description: z.string().trim().min(3),
+      predicate: z.enum(['Sangat Baik', 'Baik', 'Cukup', 'Perlu Bimbingan']).optional(),
+      dimensionScores: z
+        .record(z.string(), z.enum(['Sangat Baik', 'Baik', 'Cukup', 'Perlu Bimbingan']))
+        .optional(),
+      description: z.string().trim().optional(),
     });
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Data nilai kokurikuler tidak valid.' }, { status: 400 });
     }
+
+    const [proj] = await db
+      .select()
+      .from(cocurricularProjects)
+      .where(eq(cocurricularProjects.id, parsed.data.projectId))
+      .limit(1);
+    if (!proj) {
+      return NextResponse.json({ error: 'Kegiatan kokurikuler tidak ditemukan.' }, { status: 404 });
+    }
+    if (!canTeacherAccessScope(auth.user, proj.classId)) {
+      return NextResponse.json(
+        { error: 'Anda tidak memiliki akses menilai kokurikuler pada rombel ini.' },
+        { status: 403 }
+      );
+    }
+
+    let finalPredicate = parsed.data.predicate || 'Baik';
+    let finalDescription = parsed.data.description || '';
+    const dimScores = parsed.data.dimensionScores || {};
+    if (Object.keys(dimScores).length > 0) {
+      const dims = JSON.parse(proj.dimensionsJson || '[]') as string[];
+      const generated = buildCocurricularDescription(dims, dimScores, finalPredicate);
+      finalPredicate = generated.predicate;
+      if (!finalDescription) finalDescription = generated.description;
+    }
+    if (!finalDescription) {
+      finalDescription = `Ananda menunjukkan capaian ${finalPredicate.toLowerCase()} pada kegiatan kokurikuler.`;
+    }
+
     const existing = await db
       .select()
       .from(cocurricularScores)
@@ -585,25 +827,58 @@ export async function POST(req: NextRequest) {
     if (existing.length > 0) {
       await db
         .update(cocurricularScores)
-        .set({ predicate: parsed.data.predicate, description: parsed.data.description, updatedAt: now })
+        .set({
+          predicate: finalPredicate,
+          dimensionScoresJson: JSON.stringify(dimScores),
+          description: finalDescription,
+          updatedAt: now,
+        })
         .where(eq(cocurricularScores.id, existing[0].id));
     } else {
-      await db.insert(cocurricularScores).values({ ...parsed.data, updatedAt: now });
+      await db.insert(cocurricularScores).values({
+        projectId: parsed.data.projectId,
+        studentId: parsed.data.studentId,
+        predicate: finalPredicate,
+        dimensionScoresJson: JSON.stringify(dimScores),
+        description: finalDescription,
+        updatedAt: now,
+      });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, predicate: finalPredicate, description: finalDescription });
   }
 
   if (body?.kind === 'extracurricular_score') {
     const schema = z.object({
       extracurricularId: z.number().int().positive(),
       studentId: z.number().int().positive(),
-      predicate: z.enum(['Sangat Baik', 'Baik', 'Cukup', 'Kurang']),
-      description: z.string().trim().min(3),
+      predicate: z.enum(['Sangat Baik', 'Baik', 'Cukup', 'Kurang']).optional(),
+      tpScores: z
+        .array(
+          z.object({
+            objective: z.string().trim().min(1),
+            predicate: z.enum(['Sangat Baik', 'Baik', 'Cukup', 'Kurang']),
+          })
+        )
+        .optional(),
+      description: z.string().trim().optional(),
     });
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: 'Data nilai ekstrakurikuler tidak valid.' }, { status: 400 });
     }
+
+    const tpScoresArr = parsed.data.tpScores || [];
+    let finalPredicate = parsed.data.predicate || 'Baik';
+    let finalDescription = parsed.data.description || '';
+    if (tpScoresArr.length > 0) {
+      const generated = buildExtracurricularDescription(tpScoresArr, finalPredicate);
+      finalPredicate = generated.predicate;
+      if (!finalDescription) finalDescription = generated.description;
+    }
+    if (!finalDescription) {
+      finalDescription = `Ananda ${finalPredicate.toLowerCase()} dalam berpartisipasi aktif pada kegiatan ekstrakurikuler.`;
+    }
+
     const existing = await db
       .select()
       .from(extracurricularScores)
@@ -619,16 +894,25 @@ export async function POST(req: NextRequest) {
     if (existing.length > 0) {
       await db
         .update(extracurricularScores)
-        .set({ predicate: parsed.data.predicate, description: parsed.data.description, updatedAt: now })
+        .set({
+          predicate: finalPredicate,
+          tpScoresJson: JSON.stringify(tpScoresArr),
+          description: finalDescription,
+          updatedAt: now,
+        })
         .where(eq(extracurricularScores.id, existing[0].id));
     } else {
       await db.insert(extracurricularScores).values({
-        ...parsed.data,
+        extracurricularId: parsed.data.extracurricularId,
+        studentId: parsed.data.studentId,
         semesterId: activeSemester.id,
+        predicate: finalPredicate,
+        tpScoresJson: JSON.stringify(tpScoresArr),
+        description: finalDescription,
         updatedAt: now,
       });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, predicate: finalPredicate, description: finalDescription });
   }
 
   if (body?.kind === 'homeroom_note') {
@@ -698,5 +982,189 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  if (body?.kind === 'cocurricular_project') {
+    const parsed = cocurricularProjectSchema.safeParse({
+      ...body,
+      id: body?.id ? Number(body.id) : undefined,
+      classId: Number(body?.classId),
+    });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Data kegiatan kokurikuler tidak valid.' },
+        { status: 400 }
+      );
+    }
+    if (!canTeacherAccessScope(auth.user, parsed.data.classId)) {
+      return NextResponse.json(
+        { error: 'Anda tidak memiliki akses mengelola kokurikuler pada rombel ini.' },
+        { status: 403 }
+      );
+    }
+
+    if (parsed.data.id) {
+      await db
+        .update(cocurricularProjects)
+        .set({
+          code: parsed.data.code,
+          title: parsed.data.title,
+          dimensionsJson: JSON.stringify(parsed.data.dimensions),
+          description: parsed.data.description,
+        })
+        .where(eq(cocurricularProjects.id, parsed.data.id));
+      await logAudit({
+        userId: auth.user.id,
+        actorName: auth.user.fullName,
+        action: 'UPDATE_COCURRICULAR_PROJECT',
+        entityType: 'cocurricular_projects',
+        entityId: parsed.data.id,
+        details: `Memperbarui kegiatan kokurikuler ${parsed.data.code}.`,
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    const [created] = await db
+      .insert(cocurricularProjects)
+      .values({
+        classId: parsed.data.classId,
+        semesterId: activeSemester.id,
+        code: parsed.data.code,
+        title: parsed.data.title,
+        dimensionsJson: JSON.stringify(parsed.data.dimensions),
+        description: parsed.data.description,
+      })
+      .returning();
+    await logAudit({
+      userId: auth.user.id,
+      actorName: auth.user.fullName,
+      action: 'CREATE_COCURRICULAR_PROJECT',
+      entityType: 'cocurricular_projects',
+      entityId: created.id,
+      details: `Menambahkan kegiatan kokurikuler ${created.code} pada kelas ${parsed.data.classId}.`,
+    });
+    return NextResponse.json({ ok: true, project: created }, { status: 201 });
+  }
+
+  if (body?.kind === 'extracurricular') {
+    const parsed = extracurricularSchema.safeParse({
+      ...body,
+      id: body?.id ? Number(body.id) : undefined,
+    });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Data ekstrakurikuler tidak valid.' },
+        { status: 400 }
+      );
+    }
+
+    if (parsed.data.id) {
+      const [existing] = await db
+        .select()
+        .from(extracurriculars)
+        .where(eq(extracurriculars.id, parsed.data.id))
+        .limit(1);
+      if (!existing) {
+        return NextResponse.json({ error: 'Ekstrakurikuler tidak ditemukan.' }, { status: 404 });
+      }
+      await db
+        .update(extracurriculars)
+        .set({
+          name: parsed.data.name,
+          instructorName: parsed.data.instructorName || existing.instructorName || '-',
+          scheduleDay: parsed.data.scheduleDay || existing.scheduleDay || 'Sabtu',
+          learningObjectivesJson:
+            parsed.data.learningObjectives !== undefined
+              ? JSON.stringify(parsed.data.learningObjectives)
+              : existing.learningObjectivesJson,
+        })
+        .where(eq(extracurriculars.id, parsed.data.id));
+      await logAudit({
+        userId: auth.user.id,
+        actorName: auth.user.fullName,
+        action: 'UPDATE_EXTRACURRICULAR',
+        entityType: 'extracurriculars',
+        entityId: parsed.data.id,
+        details: `Memperbarui ekstrakurikuler ${parsed.data.name}.`,
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    const [created] = await db
+      .insert(extracurriculars)
+      .values({
+        name: parsed.data.name,
+        instructorName: parsed.data.instructorName || '-',
+        scheduleDay: parsed.data.scheduleDay || 'Sabtu',
+        learningObjectivesJson: JSON.stringify(parsed.data.learningObjectives || []),
+      })
+      .returning();
+    await logAudit({
+      userId: auth.user.id,
+      actorName: auth.user.fullName,
+      action: 'CREATE_EXTRACURRICULAR',
+      entityType: 'extracurriculars',
+      entityId: created.id,
+      details: `Menambahkan ekstrakurikuler ${created.name}.`,
+    });
+    return NextResponse.json({ ok: true, extracurricular: created }, { status: 201 });
+  }
+
   return NextResponse.json({ error: 'Jenis penyimpanan penilaian tidak dikenali.' }, { status: 400 });
+}
+
+export async function DELETE(req: NextRequest) {
+  await ensureSeeded();
+  const auth = await requireApiAuth(req, ['penilaian', 'kurikulum'], 'read');
+  if ('error' in auth) return auth.error;
+
+  const canDelete =
+    hasUserPermission(auth.user, 'kurikulum', 'delete') ||
+    hasUserPermission(auth.user, 'penilaian', 'delete');
+  if (!canDelete) {
+    return NextResponse.json(
+      { error: `Akses ditolak: peran ${auth.user.roleName} tidak memiliki izin menghapus data ini.` },
+      { status: 403 }
+    );
+  }
+
+  const { searchParams } = new URL(req.url);
+  const kind = searchParams.get('kind');
+  const idsParam = searchParams.get('ids');
+  const singleId = Number(searchParams.get('id') || 0);
+  const ids = idsParam
+    ? idsParam
+        .split(',')
+        .map((x) => Number(x.trim()))
+        .filter((x) => Number.isInteger(x) && x > 0)
+    : singleId > 0
+    ? [singleId]
+    : [];
+
+  if (ids.length === 0) {
+    return NextResponse.json({ error: 'ID penghapusan tidak valid.' }, { status: 400 });
+  }
+
+  const db = getDb();
+  if (kind === 'cocurricular_project') {
+    const rows = await db
+      .select({ id: cocurricularProjects.id, classId: cocurricularProjects.classId })
+      .from(cocurricularProjects)
+      .where(inArray(cocurricularProjects.id, ids));
+    for (const r of rows) {
+      if (!canTeacherAccessScope(auth.user, r.classId)) {
+        return NextResponse.json(
+          { error: 'Anda tidak memiliki akses menghapus kokurikuler rombel ini.' },
+          { status: 403 }
+        );
+      }
+    }
+    await db.delete(cocurricularProjects).where(inArray(cocurricularProjects.id, ids));
+    return NextResponse.json({ ok: true, deleted: ids.length });
+  }
+
+  if (kind === 'extracurricular') {
+    await db.delete(extracurriculars).where(inArray(extracurriculars.id, ids));
+    return NextResponse.json({ ok: true, deleted: ids.length });
+  }
+
+  return NextResponse.json({ error: 'Target penghapusan tidak dikenali.' }, { status: 400 });
 }

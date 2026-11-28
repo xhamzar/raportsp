@@ -107,7 +107,9 @@ export async function GET(req: NextRequest) {
       { width: 48 },
     ];
 
-    const safeFile = sanitizeFilename(`erapor-${cls.name.replace(/\s+/g, '')}-${sub.code}.xlsx`);
+    const safeFile = sanitizeFilename(
+      `erapor-${cls.name.replace(/\s+/g, '')}-${sub.code || sub.name.slice(0, 12)}.xlsx`
+    );
     const buf = Buffer.from(await workbook.xlsx.writeBuffer());
     return new NextResponse(new Uint8Array(buf), {
       headers: {

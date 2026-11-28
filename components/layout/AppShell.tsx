@@ -10,6 +10,7 @@ import {
   Building2,
   CalendarClock,
   CheckCheck,
+  ChevronDown,
   ClipboardCheck,
   FileSpreadsheet,
   GraduationCap,
@@ -36,12 +37,24 @@ import { AccessDeniedCard, TableSkeleton } from '@/components/ui/Primitives';
 import type { ModuleName } from '@/lib/auth/rbac-constants';
 import { cn } from '@/lib/utils';
 
+interface NavChildItem {
+  href: string;
+  label: string;
+  requiredModules?: ModuleName[];
+  alsoMatchPaths?: string[];
+  exactMatchPaths?: string[];
+  requiresKeasramaan?: boolean;
+  children?: NavChildItem[];
+}
+
 interface NavItem {
   href: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   requiredModules?: ModuleName[];
   alsoMatchPaths?: string[];
+  exactMatchPaths?: string[];
+  children?: NavChildItem[];
 }
 
 interface NavGroup {
@@ -68,14 +81,88 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Akademik',
     items: [
-      { href: '/kurikulum', label: 'Kurikulum & RPM', icon: BookOpen, requiredModules: ['kurikulum'] },
+      {
+        href: '/intrakurikuler',
+        label: 'Mata Pelajaran',
+        icon: BookOpen,
+        requiredModules: ['kurikulum', 'penilaian', 'keasramaan'],
+        alsoMatchPaths: ['/kurikulum', '/kokurikuler', '/ekstrakurikuler', '/keasramaan'],
+        children: [
+          {
+            href: '/intrakurikuler',
+            label: 'Intrakurikuler',
+            requiredModules: ['kurikulum'],
+            alsoMatchPaths: ['/kurikulum'],
+          },
+          {
+            href: '/kokurikuler',
+            label: 'Kokurikuler',
+            requiredModules: ['kurikulum', 'penilaian'],
+          },
+          {
+            href: '/ekstrakurikuler',
+            label: 'Ekstrakurikuler',
+            requiredModules: ['kurikulum', 'penilaian'],
+          },
+          {
+            href: '/keasramaan',
+            label: 'Keasramaan',
+            requiredModules: ['keasramaan'],
+            requiresKeasramaan: true,
+          },
+        ],
+      },
       { href: '/jadwal', label: 'Jadwal & Bel', icon: CalendarClock, requiredModules: ['jadwal'] },
       { href: '/jurnal', label: 'Jurnal Mengajar', icon: NotebookPen, requiredModules: ['kurikulum'] },
       {
         href: '/penilaian',
-        label: 'Penilaian',
+        label: 'Input Nilai',
         icon: ClipboardCheck,
-        requiredModules: ['penilaian', 'keasramaan'],
+        requiredModules: ['penilaian', 'keasramaan', 'rapor'],
+        alsoMatchPaths: ['/penilaian'],
+        children: [
+          {
+            href: '/penilaian/sumatif',
+            label: 'Intrakurikuler',
+            requiredModules: ['penilaian'],
+            alsoMatchPaths: ['/penilaian/formatif', '/penilaian/sumatif'],
+            exactMatchPaths: ['/penilaian'],
+            children: [
+              {
+                href: '/penilaian/formatif',
+                label: 'Formatif',
+                requiredModules: ['penilaian'],
+              },
+              {
+                href: '/penilaian/sumatif',
+                label: 'Sumatif',
+                requiredModules: ['penilaian'],
+                exactMatchPaths: ['/penilaian'],
+              },
+            ],
+          },
+          {
+            href: '/penilaian/kokurikuler',
+            label: 'Kokurikuler',
+            requiredModules: ['penilaian'],
+          },
+          {
+            href: '/penilaian/ekstrakurikuler',
+            label: 'Ekstrakurikuler',
+            requiredModules: ['penilaian'],
+          },
+          {
+            href: '/penilaian/keasramaan',
+            label: 'Keasramaan',
+            requiredModules: ['keasramaan'],
+            requiresKeasramaan: true,
+          },
+          {
+            href: '/penilaian/catatan',
+            label: 'Catatan Wali Kelas',
+            requiredModules: ['penilaian', 'rapor'],
+          },
+        ],
       },
     ],
   },
@@ -167,6 +254,16 @@ export function AppShell({
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => ({
+    '/intrakurikuler': ['/intrakurikuler', '/kurikulum', '/kokurikuler', '/ekstrakurikuler', '/keasramaan'].some(
+      (p) => pathname === p || pathname.startsWith(`${p}/`)
+    ),
+    '/penilaian': pathname === '/penilaian' || pathname.startsWith('/penilaian/'),
+    '/penilaian/sumatif':
+      pathname === '/penilaian' ||
+      pathname.startsWith('/penilaian/sumatif') ||
+      pathname.startsWith('/penilaian/formatif'),
+  }));
   const [notifOpen, setNotifOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [notifItems, setNotifItems] = useState<
@@ -181,8 +278,31 @@ export function AppShell({
     }>
   >([]);
 
+  const toggleMenuExpanded = useCallback((key: string) => {
+    setExpandedMenus((prev) => ({ ...prev, [key]: !prev[key] }));
+  }, []);
+
+  const canViewChild = useCallback(
+    (child: NavChildItem): boolean => {
+      const checkChild = (node: NavChildItem): boolean => {
+        if (node.requiresKeasramaan && !school?.enableKeasramaan) return false;
+        if (node.children && node.children.length > 0) {
+          return node.children.some(checkChild);
+        }
+        if (!node.requiredModules || node.requiredModules.length === 0) return true;
+        if (!user) return false;
+        return canAny(node.requiredModules, 'read');
+      };
+      return checkChild(child);
+    },
+    [school?.enableKeasramaan, user, canAny]
+  );
+
   const canViewItem = useCallback(
     (item: NavItem) => {
+      if (item.children && item.children.length > 0) {
+        return item.children.some(canViewChild);
+      }
       if (!item.requiredModules || item.requiredModules.length === 0) return true;
       if (!user) return false;
       if (item.href === '/penilaian' && !canAny(['penilaian'], 'read')) {
@@ -193,13 +313,14 @@ export function AppShell({
       }
       return canAny(item.requiredModules, 'read');
     },
-    [school?.enableKeasramaan, user, canAny]
+    [school?.enableKeasramaan, user, canAny, canViewChild]
   );
 
-  const isNavItemActive = useCallback(
-    (item: NavItem) => {
-      if (pathname === item.href || pathname.startsWith(`${item.href}/`)) return true;
-      if (item.alsoMatchPaths?.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+  const isPathMatch = useCallback(
+    (href: string, alsoMatchPaths?: string[], exactMatchPaths?: string[]) => {
+      if (pathname === href || pathname.startsWith(`${href}/`)) return true;
+      if (exactMatchPaths?.some((p) => pathname === p)) return true;
+      if (alsoMatchPaths?.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
         return true;
       }
       return false;
@@ -207,12 +328,34 @@ export function AppShell({
     [pathname]
   );
 
+  const isNavItemActive = useCallback(
+    (item: NavItem) => isPathMatch(item.href, item.alsoMatchPaths, item.exactMatchPaths),
+    [isPathMatch]
+  );
+
+  const filterNavChildren = useCallback(
+    (children: NavChildItem[]): NavChildItem[] => {
+      const filterList = (list: NavChildItem[]): NavChildItem[] =>
+        list
+          .filter(canViewChild)
+          .map((c) => (c.children ? { ...c, children: filterList(c.children) } : c));
+      return filterList(children);
+    },
+    [canViewChild]
+  );
+
   const visibleGroups = useMemo(() => {
     return NAV_GROUPS.map((group) => ({
       ...group,
-      items: group.items.filter(canViewItem),
+      items: group.items
+        .filter(canViewItem)
+        .map((item) =>
+          item.children
+            ? { ...item, children: filterNavChildren(item.children) }
+            : item
+        ),
     })).filter((group) => group.items.length > 0);
-  }, [canViewItem]);
+  }, [canViewItem, filterNavChildren]);
 
   const visibleFlatItems = visibleGroups.flatMap((g) => g.items);
   const visibleBottomTabs = MOBILE_BOTTOM_TABS.filter(canViewItem);
@@ -301,6 +444,133 @@ export function AppShell({
                 {group.items.map((item) => {
                   const active = isNavItemActive(item);
                   const Icon = item.icon;
+                  if (item.children && item.children.length > 0) {
+                    const isExpanded = Boolean(expandedMenus[item.href]);
+                    if (collapsed) {
+                      const firstHref =
+                        item.children[0]?.children?.[0]?.href ||
+                        item.children[0]?.href ||
+                        item.href;
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={firstHref}
+                            title={item.label}
+                            className={cn(
+                              'flex items-center justify-center px-0 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap shrink-0',
+                              active
+                                ? 'bg-white text-[#0F2942] font-semibold'
+                                : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                            )}
+                          >
+                            <Icon className="w-4 h-4 shrink-0" />
+                          </Link>
+                        </li>
+                      );
+                    }
+                    return (
+                      <li key={item.href} className="space-y-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleMenuExpanded(item.href)}
+                          className={cn(
+                            'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer',
+                            active && !isExpanded
+                              ? 'bg-white/15 text-white font-semibold'
+                              : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                          )}
+                        >
+                          <span className="flex items-center gap-2.5 min-w-0">
+                            <Icon className="w-4 h-4 shrink-0" />
+                            <span className="truncate">{item.label}</span>
+                          </span>
+                          <ChevronDown
+                            className={cn(
+                              'w-3.5 h-3.5 shrink-0 transition-transform duration-150',
+                              isExpanded ? 'rotate-180' : ''
+                            )}
+                          />
+                        </button>
+                        {isExpanded && (
+                          <ul className="ml-4 pl-2.5 border-l border-white/15 space-y-0.5">
+                            {item.children.map((child) => {
+                              const childActive = isPathMatch(
+                                child.href,
+                                child.alsoMatchPaths,
+                                child.exactMatchPaths
+                              );
+                              if (child.children && child.children.length > 0) {
+                                const nestedExpanded = Boolean(expandedMenus[child.href]);
+                                return (
+                                  <li key={child.href} className="space-y-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleMenuExpanded(child.href)}
+                                      className={cn(
+                                        'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap cursor-pointer',
+                                        childActive && !nestedExpanded
+                                          ? 'bg-white/15 text-white font-semibold'
+                                          : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                      )}
+                                    >
+                                      <span className="truncate">{child.label}</span>
+                                      <ChevronDown
+                                        className={cn(
+                                          'w-3 h-3 shrink-0 transition-transform duration-150',
+                                          nestedExpanded ? 'rotate-180' : ''
+                                        )}
+                                      />
+                                    </button>
+                                    {nestedExpanded && (
+                                      <ul className="ml-3 pl-2.5 border-l border-white/15 space-y-0.5">
+                                        {child.children.map((grand) => {
+                                          const grandActive = isPathMatch(
+                                            grand.href,
+                                            grand.alsoMatchPaths,
+                                            grand.exactMatchPaths
+                                          );
+                                          return (
+                                            <li key={grand.href}>
+                                              <Link
+                                                href={grand.href}
+                                                className={cn(
+                                                  'flex items-center px-2.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap',
+                                                  grandActive
+                                                    ? 'bg-white text-[#0F2942] font-semibold'
+                                                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                                )}
+                                              >
+                                                <span className="truncate">{grand.label}</span>
+                                              </Link>
+                                            </li>
+                                          );
+                                        })}
+                                      </ul>
+                                    )}
+                                  </li>
+                                );
+                              }
+                              return (
+                                <li key={child.href}>
+                                  <Link
+                                    href={child.href}
+                                    className={cn(
+                                      'flex items-center px-2.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap',
+                                      childActive
+                                        ? 'bg-white text-[#0F2942] font-semibold'
+                                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                    )}
+                                  >
+                                    <span className="truncate">{child.label}</span>
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  }
                   return (
                     <li key={item.href}>
                       <Link
@@ -563,6 +833,108 @@ export function AppShell({
                     {group.items.map((item) => {
                       const Icon = item.icon;
                       const active = isNavItemActive(item);
+                      if (item.children && item.children.length > 0) {
+                        const isExpanded = Boolean(expandedMenus[item.href]);
+                        return (
+                          <li key={`mobile-${item.href}`} className="space-y-1">
+                            <button
+                              type="button"
+                              onClick={() => toggleMenuExpanded(item.href)}
+                              className="w-full min-h-[40px] flex items-center justify-between gap-2.5 px-3 py-2 rounded-md text-xs font-medium text-slate-200 hover:bg-white/10 transition-colors whitespace-nowrap cursor-pointer"
+                            >
+                              <span className="flex items-center gap-2.5 min-w-0">
+                                <Icon className="w-4 h-4 shrink-0" />
+                                <span className="truncate">{item.label}</span>
+                              </span>
+                              <ChevronDown
+                                className={cn(
+                                  'w-4 h-4 shrink-0 transition-transform duration-150',
+                                  isExpanded ? 'rotate-180' : ''
+                                )}
+                              />
+                            </button>
+                            {isExpanded && (
+                              <ul className="ml-4 pl-3 border-l border-white/15 space-y-1">
+                                {item.children.map((child) => {
+                                  const childActive = isPathMatch(
+                                    child.href,
+                                    child.alsoMatchPaths,
+                                    child.exactMatchPaths
+                                  );
+                                  if (child.children && child.children.length > 0) {
+                                    const nestedExpanded = Boolean(expandedMenus[child.href]);
+                                    return (
+                                      <li key={`mobile-${child.href}`} className="space-y-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleMenuExpanded(child.href)}
+                                          className={cn(
+                                            'w-full min-h-[38px] flex items-center justify-between gap-2 px-3 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap cursor-pointer',
+                                            childActive && !nestedExpanded
+                                              ? 'bg-white/15 text-white font-semibold'
+                                              : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                          )}
+                                        >
+                                          <span className="truncate">{child.label}</span>
+                                          <ChevronDown
+                                            className={cn(
+                                              'w-3.5 h-3.5 shrink-0 transition-transform duration-150',
+                                              nestedExpanded ? 'rotate-180' : ''
+                                            )}
+                                          />
+                                        </button>
+                                        {nestedExpanded && (
+                                          <ul className="ml-3 pl-3 border-l border-white/15 space-y-1">
+                                            {child.children.map((grand) => {
+                                              const grandActive = isPathMatch(
+                                                grand.href,
+                                                grand.alsoMatchPaths,
+                                                grand.exactMatchPaths
+                                              );
+                                              return (
+                                                <li key={`mobile-${grand.href}`}>
+                                                  <Link
+                                                    href={grand.href}
+                                                    onClick={() => setMobileMenuOpen(false)}
+                                                    className={cn(
+                                                      'min-h-[36px] flex items-center px-3 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap',
+                                                      grandActive
+                                                        ? 'bg-white text-[#0F2942] font-semibold'
+                                                        : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                                    )}
+                                                  >
+                                                    <span className="truncate">{grand.label}</span>
+                                                  </Link>
+                                                </li>
+                                              );
+                                            })}
+                                          </ul>
+                                        )}
+                                      </li>
+                                    );
+                                  }
+                                  return (
+                                    <li key={`mobile-${child.href}`}>
+                                      <Link
+                                        href={child.href}
+                                        onClick={() => setMobileMenuOpen(false)}
+                                        className={cn(
+                                          'min-h-[38px] flex items-center px-3 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap',
+                                          childActive
+                                            ? 'bg-white text-[#0F2942] font-semibold'
+                                            : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                                        )}
+                                      >
+                                        <span className="truncate">{child.label}</span>
+                                      </Link>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </li>
+                        );
+                      }
                       return (
                         <li key={`mobile-${item.href}`}>
                           <Link

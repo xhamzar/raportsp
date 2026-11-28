@@ -467,6 +467,11 @@ function ensureTables(sqlite: Database.Database) {
       lm4 REAL,
       sts REAL,
       sas REAL,
+      sts_tes REAL,
+      sts_non_tes REAL,
+      sas_tes REAL,
+      sas_non_tes REAL,
+      tp_scores_json TEXT NOT NULL DEFAULT '{}',
       midterm_score REAL,
       final_score REAL,
       teacher_note TEXT DEFAULT '',
@@ -491,6 +496,7 @@ function ensureTables(sqlite: Database.Database) {
       project_id INTEGER NOT NULL REFERENCES cocurricular_projects(id) ON DELETE CASCADE,
       student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
       predicate TEXT NOT NULL DEFAULT 'Baik',
+      dimension_scores_json TEXT NOT NULL DEFAULT '{}',
       description TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -510,6 +516,7 @@ function ensureTables(sqlite: Database.Database) {
       student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
       semester_id INTEGER NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
       predicate TEXT NOT NULL DEFAULT 'Baik',
+      tp_scores_json TEXT NOT NULL DEFAULT '[]',
       description TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -543,7 +550,8 @@ function ensureTables(sqlite: Database.Database) {
       category TEXT NOT NULL,
       name TEXT NOT NULL,
       sort_order INTEGER NOT NULL DEFAULT 1,
-      is_active INTEGER NOT NULL DEFAULT 1
+      is_active INTEGER NOT NULL DEFAULT 1,
+      learning_objectives_json TEXT NOT NULL DEFAULT '[]'
     );
 
     CREATE TABLE IF NOT EXISTS keasramaan_scores (
@@ -778,6 +786,48 @@ function ensureTables(sqlite: Database.Database) {
     if (!existingSchoolCols.has(colName)) {
       sqlite.exec(`ALTER TABLE schools ADD COLUMN ${colName} ${colDef}`);
     }
+  }
+
+  const keasIndCols = sqlite
+    .prepare('PRAGMA table_info(keasramaan_indicators)')
+    .all() as Array<{ name: string }>;
+  if (!keasIndCols.some((c) => c.name === 'learning_objectives_json')) {
+    sqlite.exec(
+      "ALTER TABLE keasramaan_indicators ADD COLUMN learning_objectives_json TEXT NOT NULL DEFAULT '[]'"
+    );
+  }
+
+  const sumCols = sqlite.prepare('PRAGMA table_info(summative_scores)').all() as Array<{ name: string }>;
+  const existingSumCols = new Set(sumCols.map((c) => c.name));
+  const sumMigrations: Array<[string, string]> = [
+    ['sts_tes', 'REAL'],
+    ['sts_non_tes', 'REAL'],
+    ['sas_tes', 'REAL'],
+    ['sas_non_tes', 'REAL'],
+    ['tp_scores_json', "TEXT NOT NULL DEFAULT '{}'"],
+  ];
+  for (const [colName, colDef] of sumMigrations) {
+    if (!existingSumCols.has(colName)) {
+      sqlite.exec(`ALTER TABLE summative_scores ADD COLUMN ${colName} ${colDef}`);
+    }
+  }
+
+  const cocuScCols = sqlite
+    .prepare('PRAGMA table_info(cocurricular_scores)')
+    .all() as Array<{ name: string }>;
+  if (!cocuScCols.some((c) => c.name === 'dimension_scores_json')) {
+    sqlite.exec(
+      "ALTER TABLE cocurricular_scores ADD COLUMN dimension_scores_json TEXT NOT NULL DEFAULT '{}'"
+    );
+  }
+
+  const eksScCols = sqlite
+    .prepare('PRAGMA table_info(extracurricular_scores)')
+    .all() as Array<{ name: string }>;
+  if (!eksScCols.some((c) => c.name === 'tp_scores_json')) {
+    sqlite.exec(
+      "ALTER TABLE extracurricular_scores ADD COLUMN tp_scores_json TEXT NOT NULL DEFAULT '[]'"
+    );
   }
 }
 

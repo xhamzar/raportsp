@@ -10,6 +10,7 @@ export interface RawScoreComponents {
   lm2?: number | null;
   lm3?: number | null;
   lm4?: number | null;
+  lmAverageOverride?: number | null;
   sts?: number | null;
   sas?: number | null;
   remedialScore?: number | null;
@@ -34,7 +35,9 @@ export function calculateSummativeScores(
   );
 
   const lmAverage =
-    lmValues.length > 0
+    typeof scores.lmAverageOverride === 'number' && Number.isFinite(scores.lmAverageOverride)
+      ? Number(scores.lmAverageOverride.toFixed(2))
+      : lmValues.length > 0
       ? Number((lmValues.reduce((acc, v) => acc + v, 0) / lmValues.length).toFixed(2))
       : null;
 
